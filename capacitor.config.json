@@ -1,0 +1,14 @@
+{
+  "appId": "com.ashish.scrollstand",
+  "appName": "Scrollstand",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#1A202D"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

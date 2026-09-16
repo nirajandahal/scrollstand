@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1A202D">
+<title>Scrollstand</title>
+<script src="lib/pdf.min.js"></script>
+<script>
+  // Use the bundled PDF engine (added by `npm run build`); fall back to the CDN otherwise
+  window.PDF_WORKER = 'lib/pdf.worker.min.js';
+  if (!window.pdfjsLib) {
+    window.PDF_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
+  }
+</script>
+<style>
+@font-face { font-family: "Atkinson Hyperlegible"; src: url("fonts/atkinson-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Atkinson Hyperlegible"; src: url("fonts/atkinson-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+:root {
+  --desk: #DDE2EA;
+  --chrome: rgba(248, 249, 251, .92);
+  --chrome-solid: #F8F9FB;
+  --raise: #E7EBF1;
+  --ink: #1B2230;
+  --muted: #5A6577;
+  --rule: #CCD3DE;
+  --amber: #A8650F;
+  --amber-ink: #FFFFFF;
+  --band: rgba(214, 146, 40, .15);
+  --band-edge: rgba(168, 101, 15, .5);
+  --font: "Atkinson Hyperlegible", "Segoe UI", Roboto, system-ui, sans-serif;
+  --sat: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --sab: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --hh: 56px;
+  --dh: 120px;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --desk: #262E3D;
+    --chrome: rgba(26, 32, 45, .92);
+    --chrome-solid: #1A202D;
+    --raise: #2B3447;
+    --ink: #E8ECF3;
+    --muted: #9BA6B9;
+    --rule: #3A4459;
+    --amber: #F2B544;
+    --amber-ink: #1A202D;
+    --band: rgba(242, 181, 68, .13);
+    --band-edge: rgba(242, 181, 68, .55);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--ink);
+  background: var(--desk);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.btn {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  min-width: 44px; height: 44px; padding: 0 10px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+}
+.btn:hover { background: var(--raise); }
+.btn:disabled { opacity: .35; cursor: default; background: transparent; }
+.primary {
+  appearance: none; border: 0; cursor: pointer;
+  background: var(--amber); color: var(--amber-ink);
+  height: 48px; padding: 0 22px; border-radius: 24px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+
+/* ---------- Stage & reader ---------- */
+#stage { position: fixed; inset: 0; display: grid; }
+body[data-preview] #stage { padding: calc(var(--hh) + 16px) 16px calc(var(--dh) + 16px); place-items: center; }
+#frame { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--desk); }
+body[data-preview] #frame { border: 6px solid var(--chrome-solid); border-radius: 26px; box-shadow: 0 12px 40px rgba(15, 20, 30, .28); }
+#viewer { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; }
+#pages { width: max-content; min-width: 100%; padding: 12px; }
+.page {
+  position: relative; margin: 0 auto 12px; background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 20, 30, .22), 0 4px 14px rgba(15, 20, 30, .08);
+}
+.page canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* The reading guide: a lamp-coloured band where your eyes rest */
+#guide {
+  position: absolute; left: 0; right: 0; z-index: 2; pointer-events: none;
+  top: var(--guide-top, 30%); height: var(--guide-h, 28px);
+  background: var(--band);
+  border-top: 1px solid var(--band-edge); border-bottom: 1px solid var(--band-edge);
+  display: none;
+}
+#guide::before, #guide::after {
+  content: ""; position: absolute; top: 50%; transform: translateY(-50%);
+  border: 7px solid transparent;
+}
+#guide::before { left: 0; border-left: 10px solid var(--amber); }
+#guide::after { right: 0; border-right: 10px solid var(--amber); }
+body.has-pdf.guide-on #guide { display: block; }
+
+/* ---------- Top bar ---------- */
+#top {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; align-items: center; gap: 2px;
+  padding: calc(var(--sat) + 6px) 8px 6px;
+  background: var(--chrome); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rule);
+  transition: transform .25s ease;
+}
+.title { flex: 1; min-width: 0; padding: 0 6px; display: flex; flex-direction: column; }
+#fileName { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#pageInfo { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#pageInfo:empty { display: none; }
+#progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; }
+#progress i { display: block; height: 100%; background: var(--amber); transform: scaleX(0); transform-origin: left; }
+#orientBtn .i { transition: transform .2s ease; }
+
+/* ---------- Dock ---------- */
+#dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 12px calc(var(--sab) + 10px);
+  background: var(--chrome); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--rule);
+  transition: transform .25s ease;
+}
+.transport { display: flex; align-items: center; gap: 4px; }
+.jump .n { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 1ch; }
+.play { width: 60px; height: 60px; border-radius: 50%; margin: 0 10px; background: var(--amber); color: var(--amber-ink); }
+.play:hover { background: var(--amber); filter: brightness(1.07); }
+.play .i { width: 26px; height: 26px; }
+.play .when-playing, body.playing .play .when-paused { display: none; }
+body.playing .play .when-playing { display: block; }
+body.counting .play { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { filter: brightness(1.2); } }
+
+.speed { display: flex; align-items: center; gap: 4px; width: min(600px, 100%); }
+#speed { flex: 1; min-width: 70px; accent-color: var(--amber); height: 32px; }
+.readout { display: flex; flex-direction: column; align-items: flex-end; min-width: 108px; padding-left: 6px; }
+#speedOut { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#speedOut b { font-size: 20px; }
+#status { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 16px; }
+
+body.immersive #top { transform: translateY(-110%); }
+body.immersive #dock { transform: translateY(110%); }
+
+@media (orientation: landscape) and (max-height: 540px) {
+  #dock { flex-direction: row; justify-content: center; gap: 20px; padding-top: 4px; padding-bottom: calc(var(--sab) + 4px); }
+  .play { width: 50px; height: 50px; }
+  .speed { width: min(460px, 50%); }
+}
+
+/* ---------- Empty, loading, countdown, toast ---------- */
+#empty { position: absolute; inset: 0; display: grid; place-items: center; padding: calc(var(--hh) + 16px) 24px calc(var(--dh) + 16px); text-align: center; }
+body.has-pdf #empty { display: none; }
+.empty-card { max-width: 340px; }
+.empty-card h1 { font-size: 28px; line-height: 1.15; margin: 20px 0 8px; }
+.empty-card p { color: var(--muted); margin: 0 0 22px; }
+.empty-card small { display: block; margin-top: 14px; color: var(--muted); }
+.hero { width: 132px; height: 168px; margin: 0 auto; }
+.hero .sheet { fill: #fff; filter: drop-shadow(0 4px 12px rgba(15, 20, 30, .18)); }
+.hero .ln { stroke: #C4CBD6; stroke-width: 4; stroke-linecap: round; }
+.hero .band { fill: var(--band); stroke: var(--band-edge); animation: read 5s ease-in-out infinite alternate; }
+@keyframes read { from { transform: translateY(0); } to { transform: translateY(96px); } }
+body.dragging #frame::after {
+  content: "Drop the PDF to open it"; position: absolute; inset: 12px; z-index: 6;
+  display: grid; place-items: center; border: 3px dashed var(--amber); border-radius: 18px;
+  background: var(--chrome); font-weight: 700; font-size: 20px;
+}
+
+#loading { position: absolute; inset: 0; z-index: 4; display: none; place-items: center; background: var(--desk); color: var(--muted); }
+body.loading #loading { display: grid; }
+
+#countdown { position: absolute; inset: 0; z-index: 4; display: none; place-items: center; pointer-events: none; }
+body.counting #countdown { display: grid; }
+#countdown span {
+  width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 84px; font-weight: 700; color: var(--amber); background: var(--chrome);
+  box-shadow: 0 8px 30px rgba(15, 20, 30, .25); font-variant-numeric: tabular-nums;
+}
+
+#toast {
+  position: fixed; left: 50%; bottom: calc(var(--dh) + 16px); z-index: 20;
+  transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+  width: max-content; max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 22px;
+  background: var(--ink); color: var(--chrome-solid); font-size: 14px; text-align: center;
+  transition: opacity .2s, transform .2s;
+}
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+body.immersive #toast { bottom: calc(var(--sab) + 20px); }
+
+/* ---------- Settings sheet ---------- */
+dialog#settings {
+  border: 0; padding: 0; width: min(440px, calc(100% - 32px)); max-height: 86dvh; overflow: auto;
+  border-radius: 18px; background: var(--chrome-solid); color: var(--ink);
+  box-shadow: 0 20px 60px rgba(15, 20, 30, .35);
+}
+dialog#settings::backdrop { background: rgba(12, 16, 24, .45); }
+@media (max-width: 560px) {
+  dialog#settings { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 18px 18px 0 0; }
+}
+.sheet { padding: 0 20px calc(var(--sab) + 20px); }
+.sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 12px 0 8px; background: var(--chrome-solid); }
+.sheet-head h2 { margin: 0; font-size: 20px; }
+.set { padding: 14px 0; border-top: 1px solid var(--rule); }
+.set h3 { margin: 0 0 8px; font-size: 15px; }
+.hint { margin: -4px 0 10px; font-size: 13px; color: var(--muted); }
+.seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--raise); }
+.seg button { flex: 1; min-width: 0; height: 38px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 14px; }
+.seg button[aria-pressed="true"] { background: var(--chrome-solid); font-weight: 700; box-shadow: 0 1px 3px rgba(15, 20, 30, .18); }
+.stepper { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stepper .btn { background: var(--raise); }
+.stepper output { min-width: 64px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stepper .link { appearance: none; border: 0; background: none; cursor: pointer; color: var(--amber); font-weight: 700; padding: 8px; margin-left: auto; }
+.custom { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--muted); }
+.custom input { width: 84px; height: 36px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--rule); background: var(--chrome-solid); color: var(--ink); }
+.set input[type="range"] { width: 100%; accent-color: var(--amber); }
+.row-set { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.row-set h3 { margin: 0; }
+.row-set .hint { margin: 2px 0 0; }
+.switch { appearance: none; flex: none; width: 50px; height: 30px; margin: 0; border-radius: 15px; background: var(--rule); position: relative; cursor: pointer; transition: background .2s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.switch:checked { background: var(--amber); }
+.switch:checked::after { transform: translateX(20px); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+.keys dt { white-space: nowrap; }
+.keys dd { margin: 0; color: var(--muted); }
+kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--rule); background: var(--raise); }
+@media (pointer: coarse) { .desktop-only { display: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body class="guide-on">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13.5" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-upup" viewBox="0 0 24 24"><path d="M6 12l6-6 6 6M6 18l6-6 6 6"/></symbol>
+  <symbol id="i-downdown" viewBox="0 0 24 24"><path d="M6 6l6 6 6-6M6 12l6 6 6-6"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+  <symbol id="i-fs" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/></symbol>
+  <symbol id="i-fs-exit" viewBox="0 0 24 24"><path d="M9 4v4a1 1 0 0 1-1 1H4M20 9h-4a1 1 0 0 1-1-1V4M15 20v-4a1 1 0 0 1 1-1h4M4 15h4a1 1 0 0 1 1 1v4"/></symbol>
+  <symbol id="i-portrait" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 24 24"><rect x="8.5" y="6" width="7" height="12" rx="1.5"/><path d="M3.5 12a8.5 8.5 0 0 1 3.5-6.9M20.5 12a8.5 8.5 0 0 1-3.5 6.9M4 4.5h3v3M20 19.5h-3v-3"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+
+<main id="stage">
+  <div id="frame">
+    <div id="viewer" tabindex="-1" aria-label="PDF pages">
+      <div id="pages"></div>
+    </div>
+    <div id="guide" aria-hidden="true"></div>
+    <div id="countdown" aria-live="assertive"><span id="countNum">3</span></div>
+    <div id="loading" aria-live="polite"><span id="loadingText">Opening…</span></div>
+    <div id="empty">
+      <div class="empty-card">
+        <svg class="hero" viewBox="0 0 132 168" aria-hidden="true">
+          <rect class="sheet" x="10" y="6" width="112" height="156" rx="6"/>
+          <line class="ln" x1="28" y1="34" x2="104" y2="34"/>
+          <line class="ln" x1="28" y1="50" x2="96" y2="50"/>
+          <line class="ln" x1="28" y1="66" x2="104" y2="66"/>
+          <line class="ln" x1="28" y1="82" x2="84" y2="82"/>
+          <line class="ln" x1="28" y1="98" x2="104" y2="98"/>
+          <line class="ln" x1="28" y1="114" x2="100" y2="114"/>
+          <line class="ln" x1="28" y1="130" x2="70" y2="130"/>
+          <rect class="band" x="2" y="25" width="128" height="18" rx="3"/>
+        </svg>
+        <h1>Hands-free reading for any PDF</h1>
+        <p>Open a PDF, set a speed in lines per minute, and press play. The page moves under the guide while you read.</p>
+        <button class="primary" id="emptyOpen" type="button"><svg class="i"><use href="#i-open"/></svg>Open PDF</button>
+        <small class="desktop-only">or drop a PDF anywhere on this window</small>
+      </div>
+    </div>
+  </div>
+</main>
+
+<header id="top">
+  <button class="btn" id="openBtn" type="button" title="Open PDF" aria-label="Open PDF"><svg class="i"><use href="#i-open"/></svg></button>
+  <div class="title">
+    <span id="fileName">No PDF open</span>
+    <span id="pageInfo"></span>
+  </div>
+  <button class="btn" id="orientBtn" type="button" title="Orientation: Auto" aria-label="Orientation: Auto"><svg class="i"><use href="#i-auto"/></svg></button>
+  <button class="btn" id="fsBtn" type="button" title="Full screen" aria-label="Full screen"><svg class="i"><use href="#i-fs"/></svg></button>
+  <button class="btn" id="settingsBtn" type="button" title="Reading settings" aria-label="Reading settings"><svg class="i"><use href="#i-sliders"/></svg></button>
+  <div id="progress" aria-hidden="true"><i id="progressBar"></i></div>
+</header>
+
+<footer id="dock">
+  <div class="transport">
+    <button class="btn jump" id="upMany" type="button" title="Back several lines" aria-label="Back several lines"><svg class="i"><use href="#i-upup"/></svg><span class="n" data-jump>3</span></button>
+    <button class="btn" id="upOne" type="button" title="Back one line" aria-label="Back one line"><svg class="i"><use href="#i-up"/></svg></button>
+    <button class="btn play" id="playBtn" type="button" title="Play" aria-label="Play">
+      <svg class="i when-paused"><use href="#i-play"/></svg>
+      <svg class="i when-playing"><use href="#i-pause"/></svg>
+    </button>
+    <button class="btn" id="downOne" type="button" title="Forward one line" aria-label="Forward one line"><svg class="i"><use href="#i-down"/></svg></button>
+    <button class="btn jump" id="downMany" type="button" title="Forward several lines" aria-label="Forward several lines"><svg class="i"><use href="#i-downdown"/></svg><span class="n" data-jump>3</span></button>
+  </div>
+  <div class="speed">
+    <button class="btn" id="slower" type="button" title="Slower" aria-label="Slower"><svg class="i"><use href="#i-minus"/></svg></button>
+    <input type="range" id="speed" min="0" max="100" step="1" aria-label="Scroll speed">
+    <button class="btn" id="faster" type="button" title="Faster" aria-label="Faster"><svg class="i"><use href="#i-plus"/></svg></button>
+    <div class="readout">
+      <output id="speedOut" for="speed"><b>40</b> lines/min</output>
+      <span id="status"></span>
+    </div>
+  </div>
+</footer>
+
+<dialog id="settings" aria-labelledby="settingsTitle">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="settingsTitle">Reading settings</h2>
+      <button class="btn" id="closeSettings" type="button" aria-label="Close settings"><svg class="i"><use href="#i-close"/></svg></button>
+    </div>
+
+    <section class="set">
+      <h3>Orientation</h3>
+      <p class="hint" id="orientHint">Locks the screen while you read.</p>
+      <div class="seg" data-setting="orientation">
+        <button type="button" data-value="auto">Auto</button>
+        <button type="button" data-value="portrait">Portrait</button>
+        <button type="button" data-value="landscape">Landscape</button>
+      </div>
+    </section>
+
+    <section class="set">
+      <h3>Lines per jump</h3>
+      <p class="hint">How far the double-arrow buttons move.</p>
+      <div class="stepper">
+        <button class="btn" type="button" data-adjust="jump" data-by="-1" aria-label="Fewer lines per jump"><svg class="i"><use href="#i-minus"/></svg></button>
+        <output id="jumpOut">3 lines</output>
+        <button class="btn" type="button" data-adjust="jump" data-by="1" aria-label="More lines per jump"><svg class="i"><use href="#i-plus"/></svg></button>
+      </div>
+    </section>
+
+    <section class="set">
+      <h3>Start delay</h3>
+      <p class="hint">A countdown after you press play, so you can get settled.</p>
+      <div class="seg" data-setting="delay">
+        <button type="button" data-value="0">Off</button>
+        <button type="button" data-value="3">3 s</button>
+        <button type="button" data-value="5">5 s</button>
+        <button type="button" data-value="10">10 s</button>
+      </div>
+    </section>
+
+    <section class="set">
+      <h3>Stop after</h3>
+      <p class="hint">Scrolling pauses when this much reading time has passed.</p>
+      <div class="seg" data-setting="stopAfter">
+        <button type="button" data-value="0">Off</button>
+        <button type="button" data-value="5">5 min</button>
+        <button type="button" data-value="10">10 min</button>
+        <button type="button" data-value="20">20 min</button>
+        <button type="button" data-value="30">30 min</button>
+      </div>
+      <label class="custom">Other: <input id="stopCustom" type="number" inputmode="numeric" min="1" max="600" placeholder="min"> minutes</label>
+    </section>
+
+    <section class="set">
+      <h3>Zoom</h3>
+      <div class="stepper">
+        <button class="btn" type="button" data-adjust="zoom" data-by="-0.1" aria-label="Zoom out"><svg class="i"><use href="#i-minus"/></svg></button>
+        <output id="zoomOut">100%</output>
+        <button class="btn" type="button" data-adjust="zoom" data-by="0.1" aria-label="Zoom in"><svg class="i"><use href="#i-plus"/></svg></button>
+        <button class="link" type="button" id="fitWidth">Fit width</button>
+      </div>
+    </section>
+
+    <section class="set">
+      <h3>Line size</h3>
+      <p class="hint" id="lineHint">Open a PDF to measure its line spacing.</p>
+      <input type="range" id="lineFactor" min="50" max="250" step="5" aria-label="Line size adjustment">
+      <div class="stepper"><output id="lineOut" style="text-align:left;min-width:0">100%</output><button class="link" type="button" id="lineReset">Use measured size</button></div>
+    </section>
+
+    <section class="set row-set">
+      <div>
+        <h3>Reading guide</h3>
+        <p class="hint">A highlighted band showing where to read.</p>
+      </div>
+      <input type="checkbox" class="switch" id="guideToggle" aria-label="Reading guide">
+    </section>
+
+    <section class="set desktop-only">
+      <h3>Keyboard</h3>
+      <dl class="keys">
+        <dt><kbd>Space</kbd></dt><dd>Play or pause</dd>
+        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>One line</dd>
+        <dt><kbd>Shift</kbd> + <kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Several lines</dd>
+        <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Faster or slower</dd>
+        <dt><kbd>G</kbd></dt><dd>Reading guide on or off</dd>
+        <dt><kbd>H</kbd></dt><dd>Hide or show controls</dd>
+        <dt><kbd>O</kbd> <kbd>F</kbd></dt><dd>Orientation, full screen</dd>
+      </dl>
+    </section>
+  </div>
+</dialog>
+
+<input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+  const els = {
+    stage: $('#stage'), frame: $('#frame'), viewer: $('#viewer'), pages: $('#pages'),
+    top: $('#top'), dock: $('#dock'), fileName: $('#fileName'), pageInfo: $('#pageInfo'),
+    progressBar: $('#progressBar'), fileInput: $('#fileInput'), toast: $('#toast'),
+    play: $('#playBtn'), speed: $('#speed'), speedOut: $('#speedOut'), status: $('#status'),
+    countNum: $('#countNum'), loadingText: $('#loadingText'),
+    settings: $('#settings'), orientBtn: $('#orientBtn'), fsBtn: $('#fsBtn'),
+    jumpOut: $('#jumpOut'), zoomOut: $('#zoomOut'), lineFactor: $('#lineFactor'), lineOut: $('#lineOut'),
+    lineHint: $('#lineHint'), guideToggle: $('#guideToggle'), stopCustom: $('#stopCustom'), orientHint: $('#orientHint'),
+  };
+
+  const GAP = 12;                       // px between pages
+  const MIN_SPEED = 5, MAX_SPEED = 300; // lines per minute
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Settings (remembered on this device) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+  };
+  const DEFAULTS = { speed: 40, jump: 3, delay: 0, stopAfter: 0, orientation: 'auto', zoom: 1, guide: true, lineFactor: 1 };
+  const settings = Object.assign({}, DEFAULTS, store.get('scrollstand:settings', {}));
+  const saveSettings = () => store.set('scrollstand:settings', settings);
+
+  // ---------- Runtime state ----------
+  const state = {
+    pdf: null, fileKey: null, pages: [], tops: [],
+    scale: 1, linePt: 14, padTop: 12, guideTop: 0, ins: { top: 0, bottom: 0 },
+    playing: false, pos: 0, expected: 0, holding: false, holdUntil: 0,
+    anim: null, raf: 0, last: 0,
+    timerLeft: 0, countdown: null, wake: null, locked: false, nativeFs: false,
+  };
+
+  const pdfjsLib = window.pdfjsLib;
+  if (pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDF_WORKER;
+
+  // Running inside the Android app? Native plugins replace browser-only features there.
+  const Cap = window.Capacitor;
+  const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+  const Reader = isNative ? Cap.Plugins.Reader : null;
+  const AppPlugin = isNative ? Cap.Plugins.App : null;
+  const callNative = (fn) => { try { return Promise.resolve(fn()).catch((e) => console.warn(e)); } catch (e) { console.warn(e); } };
+
+  // ---------- Helpers ----------
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const median = (arr) => {
+    if (!arr.length) return 0;
+    const a = [...arr].sort((x, y) => x - y);
+    return a[Math.floor(a.length / 2)];
+  };
+  const fmtTime = (sec) => {
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    const ss = String(s).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+  };
+  // Slider is logarithmic so slow speeds get fine control
+  const speedFromSlider = (x) => Math.round(MIN_SPEED * Math.pow(MAX_SPEED / MIN_SPEED, x / 100));
+  const sliderFromSpeed = (s) => Math.round(100 * Math.log(s / MIN_SPEED) / Math.log(MAX_SPEED / MIN_SPEED));
+
+  let toastTimer;
+  function toast(msg, ms = 2600) {
+    els.toast.textContent = msg;
+    els.toast.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('on'), ms);
+  }
+
+  const linePx = () => Math.max(2, state.linePt * state.scale * settings.lineFactor);
+  const pxPerSec = () => settings.speed * linePx() / 60;
+
+  // ---------- Opening a PDF ----------
+  async function openFile(file) {
+    if (!file) return;
+    if (!pdfjsLib) { toast('The PDF engine did not load. Check your internet connection and reload.'); return; }
+    pause();
+    document.body.classList.add('loading');
+    els.loadingText.textContent = 'Opening…';
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      const head = new TextDecoder('latin1').decode(data.subarray(0, 1024));
+      if (!head.includes('%PDF')) {
+        toast('That file is not a PDF. Choose a .pdf file.');
+        return;
+      }
+      const task = pdfjsLib.getDocument({ data });
+      task.onPassword = (update, reason) => {
+        const again = reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD;
+        const pw = prompt(again ? 'That password did not work. Try again:' : 'This PDF is password-protected. Enter the password:');
+        if (pw === null) task.destroy(); else update(pw);
+      };
+      const pdf = await task.promise;
+
+      // Tear down the previous document
+      observer.disconnect();
+      state.pages.forEach(releasePage);
+      els.pages.replaceChildren();
+      state.pages = [];
+      state.tops = [];
+      if (state.pdf) state.pdf.destroy();
+      state.pdf = pdf;
+      state.fileKey = `scrollstand:pos:${file.name}:${file.size}`;
+      state.timerLeft = 0;
+
+      const frag = document.createDocumentFragment();
+      for (let n = 1; n <= pdf.numPages; n++) {
+        const page = await pdf.getPage(n);
+        const vp = page.getViewport({ scale: 1 });
+        const el = document.createElement('div');
+        el.className = 'page';
+        el.dataset.i = n - 1;
+        el.setAttribute('aria-label', `Page ${n}`);
+        state.pages.push({ page, w: vp.width, h: vp.height, el, canvas: null, task: null, rendering: 0, renderedScale: 0, visible: false, cssW: 0, cssH: 0 });
+        frag.appendChild(el);
+        if (n % 25 === 0) els.loadingText.textContent = `Reading page ${n} of ${pdf.numPages}…`;
+      }
+      els.pages.appendChild(frag);
+
+      els.loadingText.textContent = 'Measuring line spacing…';
+      state.linePt = await detectLineHeight(pdf);
+
+      els.fileName.textContent = file.name.replace(/\.pdf$/i, '');
+      document.title = `${els.fileName.textContent} · Scrollstand`;
+      document.body.classList.add('has-pdf');
+      layout(false);
+
+      const saved = store.get(state.fileKey, null);
+      if (saved && (saved.i > 0 || saved.f > 0.02)) {
+        restoreAnchor(saved);
+        toast(`Picked up where you left off, page ${Math.min(saved.i, state.pages.length - 1) + 1}`);
+      } else {
+        els.viewer.scrollTop = 0;
+        state.pos = state.expected = 0;
+      }
+      state.pages.forEach((p) => observer.observe(p.el));
+      syncUI();
+      if (!store.get('scrollstand:seenTapHint', false)) {
+        setTimeout(() => toast('Tip: tap the page to hide or show the controls', 3500), 2800);
+        store.set('scrollstand:seenTapHint', true);
+      }
+    } catch (err) {
+      console.error(err);
+      const msg = err && err.name === 'PasswordException'
+        ? 'This PDF needs a password to open.'
+        : 'This PDF could not be opened. The file may be damaged.';
+      toast(msg, 3500);
+    } finally {
+      document.body.classList.remove('loading');
+      els.fileInput.value = '';
+    }
+  }
+
+  // Estimate the typical distance between text lines (in PDF points)
+  async function detectLineHeight(pdf) {
+    const sizes = [], gaps = [];
+    const n = Math.min(pdf.numPages, 6);
+    for (let i = 1; i <= n; i++) {
+      try {
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        const ys = new Set();
+        for (const it of tc.items) {
+          if (!it.str || !it.str.trim() || !it.transform) continue;
+          const [, b, c, d, , y] = it.transform;
+          if (Math.abs(b) > 0.01 || Math.abs(c) > 0.01) continue; // skip rotated text
+          const fs = Math.abs(d);
+          if (fs < 3 || fs > 72) continue;
+          sizes.push(fs);
+          ys.add(Math.round(y));
+        }
+        const sorted = [...ys].sort((p, q) => q - p);
+        for (let k = 1; k < sorted.length; k++) gaps.push(sorted[k - 1] - sorted[k]);
+      } catch { /* ignore a page we can't read */ }
+    }
+    const fs = median(sizes);
+    if (!fs) return 14; // scanned PDF with no text layer
+    const lineGaps = gaps.filter((g) => g >= fs * 0.8 && g <= fs * 2.5);
+    return median(lineGaps) || fs * 1.2;
+  }
+
+  // ---------- Layout & rendering ----------
+  const observer = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const p = state.pages[+e.target.dataset.i];
+      if (!p) continue;
+      p.visible = e.isIntersecting;
+      if (p.visible) renderPage(p); else releasePage(p);
+    }
+  }, { root: els.viewer, rootMargin: '150% 0px 150% 0px' });
+
+  function layout(keep = true) {
+    if (!state.pages.length) return;
+    const anchor = keep ? getAnchor() : null;
+    const v = els.viewer;
+    const preview = !!document.body.dataset.preview;
+    state.ins = preview ? { top: 0, bottom: 0 } : { top: els.top.offsetHeight, bottom: els.dock.offsetHeight };
+    const vh = v.clientHeight;
+    state.guideTop = Math.round(state.ins.top + (vh - state.ins.top - state.ins.bottom) * 0.3);
+    state.padTop = settings.guide ? state.guideTop : state.ins.top + GAP;
+
+    let maxW = 0;
+    for (const p of state.pages) maxW = Math.max(maxW, p.w);
+    const avail = Math.max(120, v.clientWidth - GAP * 2);
+    state.scale = (avail / maxW) * settings.zoom;
+
+    els.pages.style.paddingTop = state.padTop + 'px';
+    els.pages.style.paddingBottom = Math.round(vh * 0.75) + 'px';
+    for (const p of state.pages) {
+      p.cssW = Math.floor(p.w * state.scale);
+      p.cssH = Math.floor(p.h * state.scale);
+      p.el.style.width = p.cssW + 'px';
+      p.el.style.height = p.cssH + 'px';
+    }
+    state.tops = state.pages.map((p) => p.el.offsetTop);
+
+    const lp = linePx();
+    els.frame.style.setProperty('--guide-top', (state.guideTop - lp * 0.5) + 'px');
+    els.frame.style.setProperty('--guide-h', (lp * 2.2) + 'px');
+
+    if (anchor) restoreAnchor(anchor);
+    for (const p of state.pages) if (p.visible) renderPage(p);
+    updateReadouts(true);
+    syncLineHint();
+  }
+
+  let layoutTimer;
+  const scheduleLayout = () => { clearTimeout(layoutTimer); layoutTimer = setTimeout(() => layout(true), 110); };
+
+  async function renderPage(p) {
+    const scale = state.scale;
+    if (p.renderedScale === scale || p.rendering === scale) return;
+    if (p.task) { p.task.cancel(); p.task = null; }
+    // Sharp on high-density screens, but capped to protect phone memory
+    let out = Math.min(window.devicePixelRatio || 1, 2);
+    const CAP = 10e6;
+    if (p.cssW * p.cssH * out * out > CAP) out = Math.sqrt(CAP / (p.cssW * p.cssH));
+    const vp = p.page.getViewport({ scale: scale * out });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(vp.width);
+    canvas.height = Math.floor(vp.height);
+    const task = p.page.render({ canvasContext: canvas.getContext('2d', { alpha: false }), viewport: vp });
+    p.task = task;
+    p.rendering = scale;
+    try {
+      await task.promise;
+    } catch (err) {
+      if (err && err.name !== 'RenderingCancelledException') console.warn(err);
+      if (p.task === task) { p.task = null; p.rendering = 0; }
+      return;
+    }
+    if (p.task !== task) return;
+    p.task = null;
+    p.rendering = 0;
+    if (!p.visible) { canvas.width = canvas.height = 0; return; }
+    if (p.canvas) { p.canvas.width = p.canvas.height = 0; p.canvas.remove(); }
+    p.el.appendChild(canvas);
+    p.canvas = canvas;
+    p.renderedScale = scale;
+  }
+
+  function releasePage(p) {
+    if (p.task) { p.task.cancel(); p.task = null; }
+    p.rendering = 0;
+    if (p.canvas) { p.canvas.width = p.canvas.height = 0; p.canvas.remove(); p.canvas = null; }
+    p.renderedScale = 0;
+  }
+
+  function pageIndexAt(y) {
+    const t = state.tops;
+    let lo = 0, hi = t.length - 1, r = 0;
+    while (lo <= hi) {
+      const m = (lo + hi) >> 1;
+      if (t[m] <= y) { r = m; lo = m + 1; } else hi = m - 1;
+    }
+    return r;
+  }
+  function getAnchor() {
+    if (!state.tops.length) return null;
+    const y = els.viewer.scrollTop + state.padTop;
+    const i = pageIndexAt(y);
+    return { i, f: Math.max(0, (y - state.tops[i]) / (state.pages[i].cssH + GAP)) };
+  }
+  function restoreAnchor(a) {
+    const i = clamp(a.i | 0, 0, state.pages.length - 1);
+    const y = state.tops[i] + a.f * (state.pages[i].cssH + GAP) - state.padTop;
+    els.viewer.scrollTop = Math.max(0, y);
+    state.pos = state.expected = els.viewer.scrollTop;
+  }
+
+  function docEnd() {
+    const last = state.pages.length - 1;
+    return last < 0 ? 0 : state.tops[last] + state.pages[last].cssH;
+  }
+  // Where "reading" happens on screen: the guide, or the bottom of the visible area
+  function readPoint() {
+    return settings.guide ? state.guideTop + linePx() : els.viewer.clientHeight - state.ins.bottom;
+  }
+  function atEnd(pos) {
+    const v = els.viewer;
+    return pos >= v.scrollHeight - v.clientHeight - 0.5 || docEnd() <= pos + readPoint();
+  }
+
+  // ---------- Scrolling engine ----------
+  function ensureLoop() {
+    if (!state.raf) {
+      state.last = performance.now();
+      state.raf = requestAnimationFrame(frame);
+    }
+  }
+
+  function frame(t) {
+    state.raf = 0;
+    const dt = clamp((t - state.last) / 1000, 0, 0.1);
+    state.last = t;
+    const v = els.viewer;
+
+    if (state.holding || t < state.holdUntil) {
+      // The reader is touching or flicking the page: follow them
+      state.anim = null;
+      state.pos = state.expected = v.scrollTop;
+    } else {
+      if (state.anim) {
+        const a = state.anim;
+        const k = clamp((t - a.start) / a.dur, 0, 1);
+        const eased = 1 - Math.pow(1 - k, 3);
+        state.pos += (eased - a.done) * a.dist;
+        a.done = eased;
+        if (k >= 1) state.anim = null;
+      }
+      if (state.playing) {
+        state.pos += pxPerSec() * dt;
+        tickTimer(dt);
+      }
+      const max = v.scrollHeight - v.clientHeight;
+      state.pos = clamp(state.pos, 0, Math.max(0, max));
+      state.expected = state.pos;
+      v.scrollTop = state.pos;
+      if (state.playing && atEnd(state.pos)) {
+        pause();
+        toast('Reached the end.');
+      }
+    }
+    updateReadouts(false);
+    if (state.playing || state.anim) state.raf = requestAnimationFrame(frame);
+  }
+
+  function tickTimer(dt) {
+    if (settings.stopAfter <= 0) return;
+    state.timerLeft -= dt;
+    if (state.timerLeft <= 0) {
+      state.timerLeft = 0;
+      pause();
+      toast("Time's up. Scrolling paused.", 3500);
+    }
+  }
+
+  function stepLines(n) {
+    if (!state.pdf) return;
+    if (!state.raf) state.pos = els.viewer.scrollTop;
+    state.holdUntil = 0;
+    const rest = state.anim ? (1 - state.anim.done) * state.anim.dist : 0;
+    const dist = n * linePx() + rest;
+    if (reduceMotion) {
+      state.pos += dist;
+      state.anim = null;
+    } else {
+      state.anim = { start: performance.now(), dur: 220, dist, done: 0 };
+    }
+    ensureLoop();
+  }
+
+  function togglePlay() {
+    if (state.countdown) { cancelCountdown(); return; }
+    if (state.playing) pause(); else play();
+  }
+
+  function play() {
+    if (!state.pdf) { els.fileInput.click(); return; }
+    if (atEnd(els.viewer.scrollTop)) { els.viewer.scrollTop = 0; }
+    if (settings.stopAfter > 0 && state.timerLeft <= 0) state.timerLeft = settings.stopAfter * 60;
+    if (!isNative && coarse && settings.orientation !== 'auto' && !state.locked) setOrientation(settings.orientation, { quiet: true });
+    if (settings.delay > 0) startCountdown(settings.delay); else begin();
+  }
+
+  function begin() {
+    state.pos = state.expected = els.viewer.scrollTop;
+    state.holdUntil = 0;
+    state.playing = true;
+    document.body.classList.add('playing');
+    els.play.title = els.play.ariaLabel = 'Pause';
+    requestWake();
+    ensureLoop();
+  }
+
+  function pause() {
+    cancelCountdown();
+    if (!state.playing) return;
+    state.playing = false;
+    document.body.classList.remove('playing');
+    els.play.title = els.play.ariaLabel = 'Play';
+    releaseWake();
+    savePosition();
+    updateReadouts(true);
+  }
+
+  function startCountdown(n) {
+    let left = n;
+    document.body.classList.add('counting');
+    els.countNum.textContent = left;
+    state.countdown = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        cancelCountdown();
+        begin();
+      } else {
+        els.countNum.textContent = left;
+      }
+    }, 1000);
+    updateReadouts(true);
+  }
+  function cancelCountdown() {
+    if (!state.countdown) return;
+    clearInterval(state.countdown);
+    state.countdown = null;
+    document.body.classList.remove('counting');
+    updateReadouts(true);
+  }
+
+  // Keep the screen on while scrolling
+  async function requestWake() {
+    if (isNative) { callNative(() => Reader.keepAwake({ on: true })); return; }
+    try {
+      if ('wakeLock' in navigator && !state.wake) {
+        state.wake = await navigator.wakeLock.request('screen');
+        state.wake.addEventListener('release', () => { state.wake = null; });
+      }
+    } catch { /* not allowed here */ }
+  }
+  function releaseWake() {
+    if (isNative) { callNative(() => Reader.keepAwake({ on: false })); return; }
+    if (state.wake) { state.wake.release().catch(() => {}); state.wake = null; }
+  }
+
+  // ---------- Readouts ----------
+  let lastReadout = 0;
+  function updateReadouts(force) {
+    const v = els.viewer;
+    const max = v.scrollHeight - v.clientHeight;
+    els.progressBar.style.transform = `scaleX(${state.pdf && max > 0 ? clamp(v.scrollTop / max, 0, 1) : 0})`;
+    const now = performance.now();
+    if (!force && now - lastReadout < 250) return;
+    lastReadout = now;
+    if (state.pdf && state.tops.length) {
+      const i = pageIndexAt(v.scrollTop + state.padTop);
+      els.pageInfo.textContent = `Page ${i + 1} of ${state.pages.length}`;
+    } else {
+      els.pageInfo.textContent = '';
+    }
+    els.status.textContent = statusText();
+  }
+
+  function statusText() {
+    if (state.countdown) return 'Starting…';
+    if (!state.pdf) return settings.stopAfter > 0 ? `Stops after ${settings.stopAfter} min` : '';
+    const parts = [];
+    const rem = Math.max(0, docEnd() - (els.viewer.scrollTop + readPoint()));
+    parts.push(`${fmtTime(rem / pxPerSec())} to the end`);
+    if (settings.stopAfter > 0) {
+      parts.push(`stops in ${fmtTime(state.timerLeft > 0 ? state.timerLeft : settings.stopAfter * 60)}`);
+    }
+    const s = parts.join(', ');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  let saveTimer;
+  function savePosition() {
+    if (!state.fileKey || !state.tops.length) return;
+    const a = getAnchor();
+    if (a) store.set(state.fileKey, a);
+  }
+  const savePositionSoon = () => { clearTimeout(saveTimer); saveTimer = setTimeout(savePosition, 500); };
+
+  // ---------- Settings actions ----------
+  function setSpeed(s) {
+    settings.speed = clamp(Math.round(s), MIN_SPEED, MAX_SPEED);
+    saveSettings();
+    syncUI();
+  }
+  function nudgeSpeed(dir) {
+    const s = settings.speed;
+    const step = s < 20 ? 1 : s < 60 ? 2 : 5;
+    setSpeed(s + dir * step);
+  }
+
+  function setZoom(z) {
+    const old = settings.zoom;
+    settings.zoom = clamp(Math.round(z * 10) / 10, 0.5, 3);
+    if (settings.zoom === old) return;
+    saveSettings();
+    layout(true);
+    const v = els.viewer;
+    v.scrollLeft = (v.scrollWidth - v.clientWidth) / 2;
+    syncUI();
+  }
+
+  function setGuide(on) {
+    settings.guide = on;
+    document.body.classList.toggle('guide-on', on);
+    saveSettings();
+    layout(true);
+    syncUI();
+  }
+
+  function setLineFactor(f) {
+    settings.lineFactor = clamp(f, 0.5, 2.5);
+    saveSettings();
+    layout(true);
+    syncUI();
+  }
+
+  const ORIENTATIONS = ['auto', 'portrait', 'landscape'];
+  function cycleOrientation() {
+    const i = ORIENTATIONS.indexOf(settings.orientation);
+    setOrientation(ORIENTATIONS[(i + 1) % ORIENTATIONS.length]);
+  }
+
+  async function setOrientation(mode, { quiet = false } = {}) {
+    settings.orientation = mode;
+    saveSettings();
+    syncUI();
+    const so = screen.orientation;
+    if (isNative) {
+      callNative(() => Reader.setOrientation({ mode }));
+      state.locked = mode !== 'auto';
+      delete document.body.dataset.preview;
+    } else if (coarse && so) {
+      // Real devices: lock the screen (browsers need full screen for this)
+      try {
+        if (mode === 'auto') {
+          if (so.unlock) so.unlock();
+          state.locked = false;
+        } else {
+          const d = document.documentElement;
+          if (!fullscreenEl() && d.requestFullscreen) await d.requestFullscreen();
+          await so.lock(mode);
+          state.locked = true;
+        }
+      } catch {
+        state.locked = false;
+        if (!quiet) toast(`This browser can't lock ${mode}. Turn your device to read in ${mode}.`, 3500);
+      }
+      delete document.body.dataset.preview;
+    } else {
+      // Desktop: show a phone-shaped preview so you can check the layout
+      if (mode === 'auto') delete document.body.dataset.preview;
+      else document.body.dataset.preview = mode;
+    }
+    sizeFrame();
+  }
+
+  function sizeFrame() {
+    const mode = document.body.dataset.preview;
+    const f = els.frame;
+    if (!mode) { f.style.width = ''; f.style.height = ''; return; }
+    const W = window.innerWidth - 32 - 12;
+    const H = window.innerHeight - els.top.offsetHeight - els.dock.offsetHeight - 32 - 12;
+    const r = mode === 'portrait' ? 9 / 19.5 : 19.5 / 9;
+    const w = Math.max(160, Math.min(W, H * r));
+    f.style.width = Math.round(w + 12) + 'px';
+    f.style.height = Math.round(w / r + 12) + 'px';
+  }
+
+  const fullscreenEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const isFullscreen = () => (isNative ? state.nativeFs : !!fullscreenEl());
+  function toggleFullscreen() {
+    if (isNative) {
+      state.nativeFs = !state.nativeFs;
+      callNative(() => Reader.setFullscreen({ on: state.nativeFs }));
+      syncUI();
+      return;
+    }
+    const d = document.documentElement;
+    try {
+      if (fullscreenEl()) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        const req = d.requestFullscreen || d.webkitRequestFullscreen;
+        Promise.resolve(req.call(d)).catch(() => toast('Full screen is not available here.'));
+      }
+    } catch {
+      toast('Full screen is not available here.');
+    }
+  }
+
+  function syncLineHint() {
+    if (!state.pdf) {
+      els.lineHint.textContent = 'Open a PDF to measure its line spacing.';
+      return;
+    }
+    const measured = Math.round(state.linePt * state.scale);
+    els.lineHint.textContent = `Measured from this PDF: ${measured} px per line at the current zoom. Adjust if the arrows move too far or not far enough.`;
+  }
+
+  function syncUI() {
+    els.speed.value = sliderFromSpeed(settings.speed);
+    els.speedOut.innerHTML = `<b>${settings.speed}</b> lines/min`;
+    document.querySelectorAll('[data-jump]').forEach((n) => { n.textContent = settings.jump; });
+    $('#upMany').title = $('#upMany').ariaLabel = `Back ${settings.jump} lines`;
+    $('#downMany').title = $('#downMany').ariaLabel = `Forward ${settings.jump} lines`;
+    els.jumpOut.textContent = `${settings.jump} lines`;
+    els.zoomOut.textContent = `${Math.round(settings.zoom * 100)}%`;
+    els.lineFactor.value = Math.round(settings.lineFactor * 100);
+    els.lineOut.textContent = `${Math.round(settings.lineFactor * 100)}% of measured`;
+    els.guideToggle.checked = settings.guide;
+    document.body.classList.toggle('guide-on', settings.guide);
+
+    document.querySelectorAll('.seg').forEach((seg) => {
+      const cur = String(settings[seg.dataset.setting]);
+      seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === cur)));
+    });
+    const presets = ['0', '5', '10', '20', '30'];
+    els.stopCustom.value = presets.includes(String(settings.stopAfter)) ? '' : settings.stopAfter;
+
+    const o = settings.orientation;
+    const label = o.charAt(0).toUpperCase() + o.slice(1);
+    const use = els.orientBtn.querySelector('use');
+    use.setAttribute('href', o === 'auto' ? '#i-auto' : '#i-portrait');
+    els.orientBtn.querySelector('.i').style.transform = o === 'landscape' ? 'rotate(90deg)' : '';
+    els.orientBtn.title = els.orientBtn.ariaLabel = `Orientation: ${label}`;
+    els.orientHint.textContent = isNative
+      ? 'Locks the screen while you read.'
+      : coarse
+      ? 'Locks the screen while you read. Uses full screen in the browser.'
+      : 'On a computer this shows a phone-shaped preview of the layout.';
+
+    els.fsBtn.querySelector('use').setAttribute('href', isFullscreen() ? '#i-fs-exit' : '#i-fs');
+    syncLineHint();
+    updateReadouts(true);
+  }
+
+  // ---------- Wiring ----------
+  const openPicker = () => els.fileInput.click();
+  $('#openBtn').addEventListener('click', openPicker);
+  $('#emptyOpen').addEventListener('click', openPicker);
+  els.fileInput.addEventListener('change', () => openFile(els.fileInput.files[0]));
+
+  els.play.addEventListener('click', togglePlay);
+  $('#upOne').addEventListener('click', () => stepLines(-1));
+  $('#downOne').addEventListener('click', () => stepLines(1));
+  $('#upMany').addEventListener('click', () => stepLines(-settings.jump));
+  $('#downMany').addEventListener('click', () => stepLines(settings.jump));
+  $('#slower').addEventListener('click', () => nudgeSpeed(-1));
+  $('#faster').addEventListener('click', () => nudgeSpeed(1));
+  els.speed.addEventListener('input', () => setSpeed(speedFromSlider(+els.speed.value)));
+
+  els.orientBtn.addEventListener('click', cycleOrientation);
+  els.fsBtn.addEventListener('click', toggleFullscreen);
+  if (!isNative && !(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) {
+    els.fsBtn.hidden = true;
+  }
+  const onFsChange = () => {
+    if (!fullscreenEl()) state.locked = false;
+    syncUI();
+  };
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+
+  $('#settingsBtn').addEventListener('click', () => { syncUI(); els.settings.showModal(); });
+  $('#closeSettings').addEventListener('click', () => els.settings.close());
+  els.settings.addEventListener('click', (e) => { if (e.target === els.settings) els.settings.close(); });
+
+  document.querySelectorAll('.seg').forEach((seg) => {
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-value]');
+      if (!b) return;
+      const key = seg.dataset.setting;
+      const raw = b.dataset.value;
+      const val = isNaN(+raw) ? raw : +raw;
+      if (key === 'orientation') { setOrientation(val); return; }
+      settings[key] = val;
+      if (key === 'stopAfter') state.timerLeft = state.playing && val > 0 ? val * 60 : 0;
+      saveSettings();
+      syncUI();
+    });
+  });
+  els.stopCustom.addEventListener('change', () => {
+    const m = Math.round(+els.stopCustom.value);
+    if (!m || m < 1) return;
+    settings.stopAfter = clamp(m, 1, 600);
+    state.timerLeft = state.playing ? settings.stopAfter * 60 : 0;
+    saveSettings();
+    syncUI();
+  });
+  document.querySelectorAll('[data-adjust]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const by = +b.dataset.by;
+      if (b.dataset.adjust === 'jump') {
+        settings.jump = clamp(settings.jump + by, 2, 30);
+        saveSettings();
+        syncUI();
+      } else {
+        setZoom(settings.zoom + by);
+      }
+    });
+  });
+  $('#fitWidth').addEventListener('click', () => setZoom(1));
+  els.lineFactor.addEventListener('input', () => setLineFactor(+els.lineFactor.value / 100));
+  $('#lineReset').addEventListener('click', () => setLineFactor(1));
+  els.guideToggle.addEventListener('change', () => setGuide(els.guideToggle.checked));
+
+  // Reader interaction: touch/drag takes over, tap toggles controls
+  const v = els.viewer;
+  const endHold = () => {
+    state.holding = false;
+    state.holdUntil = performance.now() + 150;
+    state.pos = state.expected = v.scrollTop;
+  };
+  v.addEventListener('touchstart', () => { state.holding = true; state.anim = null; }, { passive: true });
+  v.addEventListener('touchend', endHold, { passive: true });
+  v.addEventListener('touchcancel', endHold, { passive: true });
+  v.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') { state.holding = true; state.anim = null; } });
+  window.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse' && state.holding) endHold(); });
+  v.addEventListener('scroll', () => {
+    if (Math.abs(v.scrollTop - state.expected) > 2) {
+      // Someone else moved the page (wheel, flick, scrollbar): follow it
+      state.pos = state.expected = v.scrollTop;
+      state.anim = null;
+      state.holdUntil = performance.now() + 150;
+    }
+    updateReadouts(false);
+    savePositionSoon();
+  }, { passive: true });
+  v.addEventListener('click', () => {
+    if (!state.pdf) return;
+    const sel = window.getSelection && window.getSelection();
+    if (sel && String(sel)) return;
+    document.body.classList.toggle('immersive');
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t.matches && t.matches('input[type="number"], input[type="text"], textarea')) return;
+    if (els.settings.open || e.ctrlKey || e.metaKey || e.altKey) return;
+    let handled = true;
+    switch (e.key) {
+      case ' ': case 'k': case 'K': togglePlay(); break;
+      case 'ArrowDown': stepLines(e.shiftKey ? settings.jump : 1); break;
+      case 'ArrowUp': stepLines(-(e.shiftKey ? settings.jump : 1)); break;
+      case '+': case '=': nudgeSpeed(1); break;
+      case '-': case '_': nudgeSpeed(-1); break;
+      case 'f': case 'F': toggleFullscreen(); break;
+      case 'o': case 'O': cycleOrientation(); break;
+      case 'g': case 'G': setGuide(!settings.guide); break;
+      case 'h': case 'H': if (state.pdf) document.body.classList.toggle('immersive'); break;
+      default: handled = false;
+    }
+    if (handled) e.preventDefault();
+  });
+  // Stop Space from also "clicking" whichever button has focus
+  document.addEventListener('keyup', (e) => { if (e.key === ' ' && e.target.tagName === 'BUTTON') e.preventDefault(); });
+
+  // Drag and drop
+  let dragDepth = 0;
+  const hasFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+  window.addEventListener('dragenter', (e) => { if (hasFiles(e)) { dragDepth++; document.body.classList.add('dragging'); } });
+  window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) document.body.classList.remove('dragging'); });
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    document.body.classList.remove('dragging');
+    const f = e.dataTransfer && e.dataTransfer.files[0];
+    if (f) openFile(f);
+  });
+
+  // Size changes (rotation, window resize, controls wrapping)
+  const measureChrome = () => {
+    const root = document.documentElement.style;
+    root.setProperty('--hh', els.top.offsetHeight + 'px');
+    root.setProperty('--dh', els.dock.offsetHeight + 'px');
+  };
+  let lastW = 0, lastH = 0;
+  new ResizeObserver(() => {
+    if (v.clientWidth !== lastW || v.clientHeight !== lastH) {
+      lastW = v.clientWidth;
+      lastH = v.clientHeight;
+      scheduleLayout();
+    }
+  }).observe(v);
+  new ResizeObserver(() => { measureChrome(); sizeFrame(); scheduleLayout(); }).observe(els.top);
+  new ResizeObserver(() => { measureChrome(); sizeFrame(); scheduleLayout(); }).observe(els.dock);
+  window.addEventListener('resize', sizeFrame);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.playing) requestWake();
+    if (document.visibilityState === 'hidden') { pause(); savePosition(); }
+  });
+  window.addEventListener('pagehide', savePosition);
+
+  if (AppPlugin) {
+    AppPlugin.addListener('backButton', () => {
+      if (els.settings.open) els.settings.close();
+      else if (document.body.classList.contains('immersive')) document.body.classList.remove('immersive');
+      else if (state.playing || state.countdown) pause();
+      else callNative(() => AppPlugin.exitApp());
+    });
+  }
+
+  // ---------- Start ----------
+  measureChrome();
+  if (isNative && settings.orientation !== 'auto') setOrientation(settings.orientation, { quiet: true });
+  if (!coarse && settings.orientation !== 'auto') document.body.dataset.preview = settings.orientation;
+  sizeFrame();
+  syncUI();
+  if (!pdfjsLib) toast('The PDF engine did not load. Check your internet connection and reload.', 6000);
+})();
+</script>
+</body>
+</html>
