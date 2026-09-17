@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#1A202D">
+<link rel="icon" href="data:,">
 <title>Scrollstand</title>
 <script src="lib/pdf.min.js"></script>
 <script>
@@ -17,6 +18,15 @@
 <style>
 @font-face { font-family: "Atkinson Hyperlegible"; src: url("fonts/atkinson-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url("fonts/atkinson-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Literata"; src: url("fonts/literata-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Literata"; src: url("fonts/literata-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "OpenDyslexic"; src: url("fonts/opendyslexic-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "OpenDyslexic"; src: url("fonts/opendyslexic-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Mukta"; src: url("fonts/mukta-deva-400.woff2") format("woff2"); font-weight: 400; font-display: swap; unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09; }
+@font-face { font-family: "Mukta"; src: url("fonts/mukta-deva-700.woff2") format("woff2"); font-weight: 700; font-display: swap; unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09; }
+@font-face { font-family: "Mukta"; src: url("fonts/mukta-latin-400.woff2") format("woff2"); font-weight: 400; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Mukta"; src: url("fonts/mukta-latin-700.woff2") format("woff2"); font-weight: 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
 :root {
   --desk: #DDE2EA;
   --chrome: rgba(248, 249, 251, .92);
@@ -29,7 +39,10 @@
   --amber-ink: #FFFFFF;
   --band: rgba(214, 146, 40, .15);
   --band-edge: rgba(168, 101, 15, .5);
-  --font: "Atkinson Hyperlegible", "Segoe UI", Roboto, system-ui, sans-serif;
+  --paper: #FFFFFF;
+  --paper-ink: #1B2230;
+  --docx: #2F63B0;
+  --font: "Atkinson Hyperlegible", "Segoe UI", Roboto, Mukta, system-ui, sans-serif;
   --sat: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
   --sab: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
   --hh: 56px;
@@ -49,9 +62,13 @@
     --amber-ink: #1A202D;
     --band: rgba(242, 181, 68, .13);
     --band-edge: rgba(242, 181, 68, .55);
+    --paper: #1E2533;
+    --paper-ink: #E4E8EF;
+    --docx: #7EA6E6;
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
   font-family: var(--font);
@@ -77,21 +94,54 @@ button, input { font: inherit; color: inherit; }
   appearance: none; border: 0; cursor: pointer;
   background: var(--amber); color: var(--amber-ink);
   height: 48px; padding: 0 22px; border-radius: 24px; font-weight: 700;
-  display: inline-flex; align-items: center; gap: 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
+.link { appearance: none; border: 0; background: none; cursor: pointer; color: var(--amber); font-weight: 700; padding: 8px; }
 
 /* ---------- Stage & reader ---------- */
 #stage { position: fixed; inset: 0; display: grid; }
 body[data-preview] #stage { padding: calc(var(--hh) + 16px) 16px calc(var(--dh) + 16px); place-items: center; }
 #frame { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--desk); }
 body[data-preview] #frame { border: 6px solid var(--chrome-solid); border-radius: 26px; box-shadow: 0 12px 40px rgba(15, 20, 30, .28); }
-#viewer { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; }
-#pages { width: max-content; min-width: 100%; padding: 12px; }
+#viewer { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; }
+
+#pages { width: max-content; min-width: 100%; padding: 12px; transform-origin: 0 0; }
 .page {
   position: relative; margin: 0 auto 12px; background: #fff;
   box-shadow: 0 1px 2px rgba(15, 20, 30, .22), 0 4px 14px rgba(15, 20, 30, .08);
 }
 .page canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Text view: reflowed text on a paper column */
+#flowWrap { display: none; padding: 12px; transform-origin: 0 0; }
+body.view-text #flowWrap { display: block; }
+body:not(.view-pages) #pages { display: none; }
+#flow {
+  --fs: 19px; --lh: 1.6;
+  font-size: var(--fs); line-height: var(--lh);
+  max-width: min(36em, 100%); margin: 0 auto; padding: 1.1em 1.3em 2em;
+  background: var(--paper); color: var(--paper-ink); border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(15, 20, 30, .22), 0 4px 14px rgba(15, 20, 30, .08);
+  overflow-wrap: break-word;
+}
+#flow p { margin: 0 0 .8em; }
+#flow p.pre { white-space: pre-wrap; }
+#flow h1, #flow h2, #flow h3, #flow h4, #flow h5, #flow h6 { line-height: 1.25; margin: 1.1em 0 .5em; }
+#flow h1 { font-size: 1.6em; } #flow h2 { font-size: 1.35em; } #flow h3 { font-size: 1.15em; }
+#flow h4, #flow h5, #flow h6 { font-size: 1em; }
+#flow > :first-child { margin-top: 0; }
+#flow ul, #flow ol { margin: 0 0 .8em; padding-left: 1.4em; }
+#flow img { max-width: 100%; height: auto; }
+#flow a { color: inherit; }
+#flow .table-wrap { overflow-x: auto; margin: 0 0 .8em; }
+#flow table { border-collapse: collapse; font-size: .9em; }
+#flow td, #flow th { border: 1px solid var(--rule); padding: .3em .5em; vertical-align: top; }
+#flow .pgmark {
+  display: flex; align-items: center; gap: 10px; margin: 1.3em 0;
+  font-family: var(--font); font-size: 12px; line-height: 1; color: var(--muted);
+}
+#flow .pgmark::before, #flow .pgmark::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
+#flow .pgmark:first-child { margin-top: 0; }
 
 /* The reading guide: a lamp-coloured band where your eyes rest */
 #guide {
@@ -101,13 +151,11 @@ body[data-preview] #frame { border: 6px solid var(--chrome-solid); border-radius
   border-top: 1px solid var(--band-edge); border-bottom: 1px solid var(--band-edge);
   display: none;
 }
-#guide::before, #guide::after {
-  content: ""; position: absolute; top: 50%; transform: translateY(-50%);
-  border: 7px solid transparent;
-}
+#guide::before, #guide::after { content: ""; position: absolute; top: 50%; transform: translateY(-50%); border: 7px solid transparent; }
 #guide::before { left: 0; border-left: 10px solid var(--amber); }
 #guide::after { right: 0; border-right: 10px solid var(--amber); }
-body.has-pdf.guide-on #guide { display: block; }
+body.has-doc.guide-on #guide { display: block; }
+body.pinching #guide { opacity: .4; }
 
 /* ---------- Top bar ---------- */
 #top {
@@ -162,24 +210,27 @@ body.immersive #dock { transform: translateY(110%); }
 }
 
 /* ---------- Empty, loading, countdown, toast ---------- */
-#empty { position: absolute; inset: 0; display: grid; place-items: center; padding: calc(var(--hh) + 16px) 24px calc(var(--dh) + 16px); text-align: center; }
-body.has-pdf #empty { display: none; }
-.empty-card { max-width: 340px; }
-.empty-card h1 { font-size: 28px; line-height: 1.15; margin: 20px 0 8px; }
-.empty-card p { color: var(--muted); margin: 0 0 22px; }
-.empty-card small { display: block; margin-top: 14px; color: var(--muted); }
-.hero { width: 132px; height: 168px; margin: 0 auto; }
+#empty { position: absolute; inset: 0; overflow: auto; display: grid; place-items: center; padding: calc(var(--hh) + 16px) 20px calc(var(--dh) + 16px); text-align: center; }
+body.has-doc #empty { display: none; }
+.empty-card { width: min(380px, 100%); }
+.empty-card h1 { font-size: 27px; line-height: 1.15; margin: 18px 0 8px; }
+.empty-card p { color: var(--muted); margin: 0 0 20px; }
+.empty-card small { display: block; margin-top: 12px; color: var(--muted); }
+.hero { width: 120px; height: 152px; margin: 0 auto; }
 .hero .sheet { fill: #fff; filter: drop-shadow(0 4px 12px rgba(15, 20, 30, .18)); }
 .hero .ln { stroke: #C4CBD6; stroke-width: 4; stroke-linecap: round; }
 .hero .band { fill: var(--band); stroke: var(--band-edge); animation: read 5s ease-in-out infinite alternate; }
-@keyframes read { from { transform: translateY(0); } to { transform: translateY(96px); } }
+@keyframes read { from { transform: translateY(0); } to { transform: translateY(80px); } }
+#recent { margin-top: 26px; text-align: left; }
+.recent-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.recent-head h2 { margin: 0; font-size: 15px; }
 body.dragging #frame::after {
-  content: "Drop the PDF to open it"; position: absolute; inset: 12px; z-index: 6;
+  content: "Drop the file to open it"; position: absolute; inset: 12px; z-index: 6;
   display: grid; place-items: center; border: 3px dashed var(--amber); border-radius: 18px;
   background: var(--chrome); font-weight: 700; font-size: 20px;
 }
 
-#loading { position: absolute; inset: 0; z-index: 4; display: none; place-items: center; background: var(--desk); color: var(--muted); }
+#loading { position: absolute; inset: 0; z-index: 4; display: none; place-items: center; padding: 24px; text-align: center; background: var(--desk); color: var(--muted); }
 body.loading #loading { display: grid; }
 
 #countdown { position: absolute; inset: 0; z-index: 4; display: none; place-items: center; pointer-events: none; }
@@ -200,15 +251,38 @@ body.counting #countdown { display: grid; }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
 body.immersive #toast { bottom: calc(var(--sab) + 20px); }
 
-/* ---------- Settings sheet ---------- */
-dialog#settings {
-  border: 0; padding: 0; width: min(440px, calc(100% - 32px)); max-height: 86dvh; overflow: auto;
+/* ---------- Book rows (library + recent) ---------- */
+.books { list-style: none; margin: 0; padding: 0; }
+.book { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--rule); }
+.book:first-child { border-top: 0; }
+.book-open {
+  appearance: none; border: 0; background: none; cursor: pointer; text-align: left;
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-radius: 10px;
+}
+.book-open:hover { background: var(--raise); }
+.badge {
+  flex: none; width: 42px; height: 52px; border-radius: 5px; display: grid; place-items: end center; padding-bottom: 7px;
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; color: #fff; background: var(--muted);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .12);
+}
+.badge.pdf { background: #B4541A; }
+.badge.docx { background: var(--docx); }
+.book-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.book-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.book-meta { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { display: block; height: 4px; border-radius: 2px; background: var(--raise); overflow: hidden; margin-top: 3px; }
+.bar i { display: block; height: 100%; background: var(--amber); }
+.book-del { color: var(--muted); }
+
+/* ---------- Sheets (settings, library) ---------- */
+dialog.sheet-dialog {
+  border: 0; padding: 0; width: min(460px, calc(100% - 32px)); max-height: 86dvh; overflow: auto;
   border-radius: 18px; background: var(--chrome-solid); color: var(--ink);
   box-shadow: 0 20px 60px rgba(15, 20, 30, .35);
 }
-dialog#settings::backdrop { background: rgba(12, 16, 24, .45); }
+dialog.sheet-dialog::backdrop { background: rgba(12, 16, 24, .45); }
 @media (max-width: 560px) {
-  dialog#settings { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 18px 18px 0 0; }
+  dialog.sheet-dialog { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 18px 18px 0 0; }
 }
 .sheet { padding: 0 20px calc(var(--sab) + 20px); }
 .sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 12px 0 8px; background: var(--chrome-solid); }
@@ -222,7 +296,7 @@ dialog#settings::backdrop { background: rgba(12, 16, 24, .45); }
 .stepper { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .stepper .btn { background: var(--raise); }
 .stepper output { min-width: 64px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
-.stepper .link { appearance: none; border: 0; background: none; cursor: pointer; color: var(--amber); font-weight: 700; padding: 8px; margin-left: auto; }
+.stepper .link { margin-left: auto; }
 .custom { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--muted); }
 .custom input { width: 84px; height: 36px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--rule); background: var(--chrome-solid); color: var(--ink); }
 .set input[type="range"] { width: 100%; accent-color: var(--amber); }
@@ -233,10 +307,28 @@ dialog#settings::backdrop { background: rgba(12, 16, 24, .45); }
 .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
 .switch:checked { background: var(--amber); }
 .switch:checked::after { transform: translateX(20px); }
+.font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+.font-grid button {
+  appearance: none; cursor: pointer; text-align: left; padding: 10px 12px; border-radius: 12px;
+  border: 1.5px solid var(--rule); background: var(--chrome-solid);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.font-grid button[aria-pressed="true"] { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+.font-grid .sample { font-size: 22px; line-height: 1.2; }
+.font-grid .name { font-family: var(--font); font-size: 12px; color: var(--muted); }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
 .keys dt { white-space: nowrap; }
 .keys dd { margin: 0; color: var(--muted); }
 kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--rule); background: var(--raise); }
+.lib-open { width: 100%; margin: 4px 0 6px; }
+.lib-types { text-align: center; margin: 0 0 12px; }
+.lib-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+#libEmpty { text-align: center; margin: 18px 0 6px; }
+
+/* Which settings apply to what's open */
+body.has-doc:not(.view-pages) .only-pages { display: none; }
+body.has-doc:not(.view-text) .only-text { display: none; }
+body:not([data-kind="pdf"]) .only-pdf { display: none; }
 @media (pointer: coarse) { .desktop-only { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -244,10 +336,11 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
 }
 </style>
 </head>
-<body class="guide-on">
+<body class="guide-on view-pages">
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></symbol>
+  <symbol id="i-books" viewBox="0 0 24 24"><path d="M4 5a1 1 0 0 1 1-1h3v16H5a1 1 0 0 1-1-1zM8 4h4v16H8zM14.6 4.8l3.3-.9 3.5 15.3-3.3.9z"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13.5" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
@@ -262,12 +355,14 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   <symbol id="i-portrait" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></symbol>
   <symbol id="i-auto" viewBox="0 0 24 24"><rect x="8.5" y="6" width="7" height="12" rx="1.5"/><path d="M3.5 12a8.5 8.5 0 0 1 3.5-6.9M20.5 12a8.5 8.5 0 0 1-3.5 6.9M4 4.5h3v3M20 19.5h-3v-3"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5"/></symbol>
 </svg>
 
 <main id="stage">
   <div id="frame">
-    <div id="viewer" tabindex="-1" aria-label="PDF pages">
+    <div id="viewer" tabindex="-1" aria-label="Document">
       <div id="pages"></div>
+      <div id="flowWrap"><article id="flow"></article></div>
     </div>
     <div id="guide" aria-hidden="true"></div>
     <div id="countdown" aria-live="assertive"><span id="countNum">3</span></div>
@@ -285,19 +380,26 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
           <line class="ln" x1="28" y1="130" x2="70" y2="130"/>
           <rect class="band" x="2" y="25" width="128" height="18" rx="3"/>
         </svg>
-        <h1>Hands-free reading for any PDF</h1>
-        <p>Open a PDF, set a speed in lines per minute, and press play. The page moves under the guide while you read.</p>
-        <button class="primary" id="emptyOpen" type="button"><svg class="i"><use href="#i-open"/></svg>Open PDF</button>
-        <small class="desktop-only">or drop a PDF anywhere on this window</small>
+        <h1>Hands-free reading for PDFs, Word and text files</h1>
+        <p>Open a file, set a speed in lines per minute, and press play. The page moves under the guide while you read.</p>
+        <button class="primary" id="emptyOpen" type="button"><svg class="i"><use href="#i-open"/></svg>Open a file</button>
+        <small class="desktop-only">or drop a file anywhere on this window</small>
+        <section id="recent" hidden>
+          <div class="recent-head">
+            <h2>Continue reading</h2>
+            <button class="link" id="recentAll" type="button">Library</button>
+          </div>
+          <ul class="books" id="recentList"></ul>
+        </section>
       </div>
     </div>
   </div>
 </main>
 
 <header id="top">
-  <button class="btn" id="openBtn" type="button" title="Open PDF" aria-label="Open PDF"><svg class="i"><use href="#i-open"/></svg></button>
+  <button class="btn" id="libraryBtn" type="button" title="Library" aria-label="Library"><svg class="i"><use href="#i-books"/></svg></button>
   <div class="title">
-    <span id="fileName">No PDF open</span>
+    <span id="fileName">Scrollstand</span>
     <span id="pageInfo"></span>
   </div>
   <button class="btn" id="orientBtn" type="button" title="Orientation: Auto" aria-label="Orientation: Auto"><svg class="i"><use href="#i-auto"/></svg></button>
@@ -328,12 +430,82 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   </div>
 </footer>
 
-<dialog id="settings" aria-labelledby="settingsTitle">
+<dialog id="library" class="sheet-dialog" aria-labelledby="libTitle">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="libTitle">Library</h2>
+      <button class="btn" data-close type="button" aria-label="Close library"><svg class="i"><use href="#i-close"/></svg></button>
+    </div>
+    <button class="primary lib-open" id="libOpen" type="button"><svg class="i"><use href="#i-open"/></svg>Open a file</button>
+    <p class="hint lib-types">PDF, Word (.docx) or text (.txt, .md)</p>
+    <ul class="books" id="bookList"></ul>
+    <p class="hint" id="libEmpty">Files you open are kept on this device, so you can come back to them and pick up where you left off.</p>
+    <div class="lib-foot" id="libFoot">
+      <span id="libUsage"></span>
+      <button class="link" id="libClear" type="button">Clear library</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="settings" class="sheet-dialog" aria-labelledby="settingsTitle">
   <div class="sheet">
     <div class="sheet-head">
       <h2 id="settingsTitle">Reading settings</h2>
-      <button class="btn" id="closeSettings" type="button" aria-label="Close settings"><svg class="i"><use href="#i-close"/></svg></button>
+      <button class="btn" data-close type="button" aria-label="Close settings"><svg class="i"><use href="#i-close"/></svg></button>
     </div>
+
+    <section class="set only-pdf">
+      <h3>View</h3>
+      <p class="hint">Text view reflows the PDF's words so you can change the font and size. Pictures and page layout are left out.</p>
+      <div class="seg" data-setting="view">
+        <button type="button" data-value="pages">Pages</button>
+        <button type="button" data-value="text">Text</button>
+      </div>
+    </section>
+
+    <section class="set only-text">
+      <h3>Font</h3>
+      <div class="font-grid" id="fontGrid"></div>
+    </section>
+
+    <section class="set only-text">
+      <h3>Text size</h3>
+      <p class="hint">You can also pinch with two fingers.</p>
+      <div class="stepper">
+        <button class="btn" type="button" data-adjust="zoom" data-by="-0.1" aria-label="Smaller text"><svg class="i"><use href="#i-minus"/></svg></button>
+        <output data-zoom-out>100%</output>
+        <button class="btn" type="button" data-adjust="zoom" data-by="0.1" aria-label="Larger text"><svg class="i"><use href="#i-plus"/></svg></button>
+        <button class="link" type="button" data-zoom-reset>Reset</button>
+      </div>
+    </section>
+
+    <section class="set only-text">
+      <h3>Line spacing</h3>
+      <div class="seg" data-setting="lineHeight">
+        <button type="button" data-value="1.4">Tight</button>
+        <button type="button" data-value="1.6">Normal</button>
+        <button type="button" data-value="1.8">Relaxed</button>
+        <button type="button" data-value="2">Wide</button>
+      </div>
+    </section>
+
+    <section class="set only-pages">
+      <h3>Zoom</h3>
+      <p class="hint">You can also pinch with two fingers<span class="desktop-only">, or pinch on a trackpad</span>.</p>
+      <div class="stepper">
+        <button class="btn" type="button" data-adjust="zoom" data-by="-0.1" aria-label="Zoom out"><svg class="i"><use href="#i-minus"/></svg></button>
+        <output data-zoom-out>100%</output>
+        <button class="btn" type="button" data-adjust="zoom" data-by="0.1" aria-label="Zoom in"><svg class="i"><use href="#i-plus"/></svg></button>
+        <button class="link" type="button" data-zoom-reset>Fit width</button>
+      </div>
+    </section>
+
+    <section class="set only-pages">
+      <h3>Line size</h3>
+      <p class="hint" id="lineHint">Open a PDF to measure its line spacing.</p>
+      <input type="range" id="lineFactor" min="50" max="250" step="5" aria-label="Line size adjustment">
+      <div class="stepper"><output id="lineOut" style="text-align:left;min-width:0">100%</output><button class="link" type="button" id="lineReset">Use measured size</button></div>
+    </section>
 
     <section class="set">
       <h3>Orientation</h3>
@@ -379,23 +551,6 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
       <label class="custom">Other: <input id="stopCustom" type="number" inputmode="numeric" min="1" max="600" placeholder="min"> minutes</label>
     </section>
 
-    <section class="set">
-      <h3>Zoom</h3>
-      <div class="stepper">
-        <button class="btn" type="button" data-adjust="zoom" data-by="-0.1" aria-label="Zoom out"><svg class="i"><use href="#i-minus"/></svg></button>
-        <output id="zoomOut">100%</output>
-        <button class="btn" type="button" data-adjust="zoom" data-by="0.1" aria-label="Zoom in"><svg class="i"><use href="#i-plus"/></svg></button>
-        <button class="link" type="button" id="fitWidth">Fit width</button>
-      </div>
-    </section>
-
-    <section class="set">
-      <h3>Line size</h3>
-      <p class="hint" id="lineHint">Open a PDF to measure its line spacing.</p>
-      <input type="range" id="lineFactor" min="50" max="250" step="5" aria-label="Line size adjustment">
-      <div class="stepper"><output id="lineOut" style="text-align:left;min-width:0">100%</output><button class="link" type="button" id="lineReset">Use measured size</button></div>
-    </section>
-
     <section class="set row-set">
       <div>
         <h3>Reading guide</h3>
@@ -411,6 +566,8 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
         <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>One line</dd>
         <dt><kbd>Shift</kbd> + <kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Several lines</dd>
         <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Faster or slower</dd>
+        <dt><kbd>Ctrl</kbd> + scroll</dt><dd>Zoom</dd>
+        <dt><kbd>L</kbd></dt><dd>Library</dd>
         <dt><kbd>G</kbd></dt><dd>Reading guide on or off</dd>
         <dt><kbd>H</kbd></dt><dd>Hide or show controls</dd>
         <dt><kbd>O</kbd> <kbd>F</kbd></dt><dd>Orientation, full screen</dd>
@@ -419,7 +576,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   </div>
 </dialog>
 
-<input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+<input type="file" id="fileInput" accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,.md,text/plain,text/markdown" hidden>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -427,34 +584,61 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   'use strict';
 
   const $ = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
   const els = {
-    stage: $('#stage'), frame: $('#frame'), viewer: $('#viewer'), pages: $('#pages'),
+    frame: $('#frame'), viewer: $('#viewer'), pages: $('#pages'), flowWrap: $('#flowWrap'), flow: $('#flow'),
     top: $('#top'), dock: $('#dock'), fileName: $('#fileName'), pageInfo: $('#pageInfo'),
     progressBar: $('#progressBar'), fileInput: $('#fileInput'), toast: $('#toast'),
     play: $('#playBtn'), speed: $('#speed'), speedOut: $('#speedOut'), status: $('#status'),
     countNum: $('#countNum'), loadingText: $('#loadingText'),
-    settings: $('#settings'), orientBtn: $('#orientBtn'), fsBtn: $('#fsBtn'),
-    jumpOut: $('#jumpOut'), zoomOut: $('#zoomOut'), lineFactor: $('#lineFactor'), lineOut: $('#lineOut'),
+    settings: $('#settings'), library: $('#library'), orientBtn: $('#orientBtn'), fsBtn: $('#fsBtn'),
+    jumpOut: $('#jumpOut'), lineFactor: $('#lineFactor'), lineOut: $('#lineOut'),
     lineHint: $('#lineHint'), guideToggle: $('#guideToggle'), stopCustom: $('#stopCustom'), orientHint: $('#orientHint'),
+    fontGrid: $('#fontGrid'), bookList: $('#bookList'), libEmpty: $('#libEmpty'), libFoot: $('#libFoot'),
+    libUsage: $('#libUsage'), recent: $('#recent'), recentList: $('#recentList'),
   };
 
-  const GAP = 12;                       // px between pages
+  const GAP = 12;                       // px between PDF pages
   const MIN_SPEED = 5, MAX_SPEED = 300; // lines per minute
+  const BASE_FONT = 19;                 // text view font size at 100%
+  const MAX_BOOKS = 60, MAX_BYTES = 1024 ** 3;
+  const ZOOM_LIMITS = { pages: [0.5, 4], text: [0.5, 3] };
   const coarse = matchMedia('(pointer: coarse)').matches;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MIME = {
+    pdf: 'application/pdf',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    txt: 'text/plain',
+  };
+  const DEVANAGARI = 'Mukta, "Noto Sans Devanagari"';
+  const FONTS = {
+    atkinson: { label: 'Atkinson', stack: `"Atkinson Hyperlegible", ${DEVANAGARI}, system-ui, sans-serif` },
+    literata: { label: 'Literata', stack: `Literata, ${DEVANAGARI}, Georgia, serif` },
+    mukta: { label: 'Mukta · नेपाली', stack: `Mukta, "Noto Sans Devanagari", sans-serif`, sample: 'Aa अ' },
+    dyslexic: { label: 'OpenDyslexic', stack: `OpenDyslexic, ${DEVANAGARI}, sans-serif` },
+    serif: { label: 'System serif', stack: `Georgia, "Noto Serif", ${DEVANAGARI}, serif` },
+    sans: { label: 'System sans', stack: `system-ui, Roboto, ${DEVANAGARI}, sans-serif` },
+    mono: { label: 'Monospace', stack: `ui-monospace, "Roboto Mono", Menlo, ${DEVANAGARI}, monospace` },
+  };
 
   // ---------- Settings (remembered on this device) ----------
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
   };
-  const DEFAULTS = { speed: 40, jump: 3, delay: 0, stopAfter: 0, orientation: 'auto', zoom: 1, guide: true, lineFactor: 1 };
+  const DEFAULTS = {
+    speed: 40, jump: 3, delay: 0, stopAfter: 0, orientation: 'auto', guide: true,
+    zoom: 1, lineFactor: 1, textZoom: 1, font: 'atkinson', lineHeight: 1.6,
+  };
   const settings = Object.assign({}, DEFAULTS, store.get('scrollstand:settings', {}));
+  if (!FONTS[settings.font]) settings.font = DEFAULTS.font;
   const saveSettings = () => store.set('scrollstand:settings', settings);
 
   // ---------- Runtime state ----------
   const state = {
-    pdf: null, fileKey: null, pages: [], tops: [],
+    doc: null, view: 'pages',
+    pages: [], tops: [],                                // PDF page view
+    blocks: [], btops: [], pageFirst: [], flowEnd: 0,   // text view
     scale: 1, linePt: 14, padTop: 12, guideTop: 0, ins: { top: 0, bottom: 0 },
     playing: false, pos: 0, expected: 0, holding: false, holdUntil: 0,
     anim: null, raf: 0, last: 0,
@@ -471,6 +655,48 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   const AppPlugin = isNative ? Cap.Plugins.App : null;
   const callNative = (fn) => { try { return Promise.resolve(fn()).catch((e) => console.warn(e)); } catch (e) { console.warn(e); } };
 
+  // ---------- Local database (files + reading history, kept on the device) ----------
+  const DB = (() => {
+    let dbp = null;
+    const open = () => {
+      if (!dbp) {
+        dbp = new Promise((resolve, reject) => {
+          if (!window.indexedDB) { reject(new Error('IndexedDB unavailable')); return; }
+          const req = indexedDB.open('scrollstand', 1);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            db.createObjectStore('books', { keyPath: 'id' });
+            db.createObjectStore('files');
+            db.createObjectStore('renders');
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+      return dbp;
+    };
+    const run = async (storeName, mode, fn) => {
+      const db = await open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, mode);
+        const req = fn(tx.objectStore(storeName));
+        let result;
+        if (req) req.onsuccess = () => { result = req.result; };
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    };
+    return {
+      get: (s, key) => run(s, 'readonly', (o) => o.get(key)),
+      put: (s, value, key) => run(s, 'readwrite', (o) => (key === undefined ? o.put(value) : o.put(value, key))),
+      del: (s, key) => run(s, 'readwrite', (o) => o.delete(key)),
+      all: (s) => run(s, 'readonly', (o) => o.getAll()),
+      clear: (s) => run(s, 'readwrite', (o) => o.clear()),
+    };
+  })();
+  if (!isNative && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
   // ---------- Helpers ----------
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const median = (arr) => {
@@ -478,11 +704,27 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     const a = [...arr].sort((x, y) => x - y);
     return a[Math.floor(a.length / 2)];
   };
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmtTime = (sec) => {
     sec = Math.max(0, Math.round(sec));
     const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
     const ss = String(s).padStart(2, '0');
     return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+  };
+  const fmtBytes = (n) => {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 ** 2) return `${Math.round(n / 1024)} KB`;
+    if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(n < 10 * 1024 ** 2 ? 1 : 0)} MB`;
+    return `${(n / 1024 ** 3).toFixed(1)} GB`;
+  };
+  const relTime = (ts) => {
+    const d = (Date.now() - ts) / 1000;
+    if (d < 60) return 'just now';
+    if (d < 3600) return `${Math.floor(d / 60)} min ago`;
+    if (d < 86400) return `${Math.floor(d / 3600)} h ago`;
+    if (d < 172800) return 'yesterday';
+    if (d < 604800) return `${Math.floor(d / 86400)} days ago`;
+    return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   };
   // Slider is logarithmic so slow speeds get fine control
   const speedFromSlider = (x) => Math.round(MIN_SPEED * Math.pow(MAX_SPEED / MIN_SPEED, x / 100));
@@ -495,89 +737,200 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => els.toast.classList.remove('on'), ms);
   }
+  function setLoading(text) {
+    document.body.classList.toggle('loading', !!text);
+    if (text) els.loadingText.textContent = text;
+  }
+  class UserError extends Error {}
 
-  const linePx = () => Math.max(2, state.linePt * state.scale * settings.lineFactor);
+  const textFontPx = () => BASE_FONT * settings.textZoom;
+  const linePx = () => (state.view === 'text'
+    ? textFontPx() * settings.lineHeight
+    : Math.max(2, state.linePt * state.scale * settings.lineFactor));
   const pxPerSec = () => settings.speed * linePx() / 60;
+  const zoomKey = () => (state.view === 'text' ? 'textZoom' : 'zoom');
+  const zoomLimits = () => ZOOM_LIMITS[state.view];
 
-  // ---------- Opening a PDF ----------
+  // ---------- Opening files ----------
+  function detectKind(b, name = '') {
+    const head = new TextDecoder('latin1').decode(b.subarray(0, 1024));
+    if (head.includes('%PDF')) return 'pdf';
+    if (b[0] === 0x50 && b[1] === 0x4B && b[2] === 3 && b[3] === 4) {
+      const zipText = new TextDecoder('latin1').decode(b.subarray(0, 512 * 1024));
+      return /\.docx$/i.test(name) || zipText.includes('word/') ? 'docx' : 'zip';
+    }
+    if (b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0) return 'doc';
+    if (head.startsWith('{\\rtf')) return 'rtf';
+    if ((b[0] === 0xFF && b[1] === 0xFE) || (b[0] === 0xFE && b[1] === 0xFF)) return 'txt';
+    const sample = b.subarray(0, 8192);
+    let control = 0;
+    for (const c of sample) {
+      if (c === 0) return null;
+      if (c < 9 || (c > 13 && c < 32)) control++;
+    }
+    return control / Math.max(1, sample.length) < 0.02 ? 'txt' : null;
+  }
+
+  function decodeText(b) {
+    if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return new TextDecoder('utf-8').decode(b.subarray(3));
+    if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
+    if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(b); } catch { return new TextDecoder('windows-1252').decode(b); }
+  }
+
+  async function hashBytes(b, name) {
+    try {
+      const digest = await crypto.subtle.digest('SHA-1', b);
+      return Array.from(new Uint8Array(digest).slice(0, 12), (x) => x.toString(16).padStart(2, '0')).join('');
+    } catch {
+      return `${name}|${b.length}`;
+    }
+  }
+
+  function cleanName(name) {
+    const base = (name || '').replace(/\.(pdf|docx|txt|md|markdown|text)$/i, '').trim();
+    return !base || /^(msf|document|primary|image|raw):/i.test(base) ? 'Untitled document' : base;
+  }
+
   async function openFile(file) {
     if (!file) return;
-    if (!pdfjsLib) { toast('The PDF engine did not load. Check your internet connection and reload.'); return; }
     pause();
-    document.body.classList.add('loading');
-    els.loadingText.textContent = 'Opening…';
+    setLoading('Opening…');
     try {
-      const data = new Uint8Array(await file.arrayBuffer());
-      const head = new TextDecoder('latin1').decode(data.subarray(0, 1024));
-      if (!head.includes('%PDF')) {
-        toast('That file is not a PDF. Choose a .pdf file.');
-        return;
-      }
-      const task = pdfjsLib.getDocument({ data });
-      task.onPassword = (update, reason) => {
-        const again = reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD;
-        const pw = prompt(again ? 'That password did not work. Try again:' : 'This PDF is password-protected. Enter the password:');
-        if (pw === null) task.destroy(); else update(pw);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const kind = detectKind(bytes, file.name);
+      if (kind === 'doc') throw new UserError('Old .doc files can’t be opened. Save it as .docx in Word or Google Docs and try again.');
+      if (kind === 'rtf') throw new UserError('RTF files aren’t supported. Save it as .docx or .txt and try again.');
+      if (!['pdf', 'docx', 'txt'].includes(kind)) throw new UserError('This file type isn’t supported. Open a PDF, Word (.docx) or text file.');
+      if (kind === 'pdf' && !pdfjsLib) throw new UserError('The PDF engine didn’t load. Check your connection and reload.');
+
+      const id = await hashBytes(bytes, file.name);
+      const existing = await DB.get('books', id).catch(() => null);
+      const meta = existing || {
+        id, kind, name: cleanName(file.name), size: bytes.length,
+        added: Date.now(), opened: Date.now(), progress: 0,
       };
-      const pdf = await task.promise;
-
-      // Tear down the previous document
-      observer.disconnect();
-      state.pages.forEach(releasePage);
-      els.pages.replaceChildren();
-      state.pages = [];
-      state.tops = [];
-      if (state.pdf) state.pdf.destroy();
-      state.pdf = pdf;
-      state.fileKey = `scrollstand:pos:${file.name}:${file.size}`;
-      state.timerLeft = 0;
-
-      const frag = document.createDocumentFragment();
-      for (let n = 1; n <= pdf.numPages; n++) {
-        const page = await pdf.getPage(n);
-        const vp = page.getViewport({ scale: 1 });
-        const el = document.createElement('div');
-        el.className = 'page';
-        el.dataset.i = n - 1;
-        el.setAttribute('aria-label', `Page ${n}`);
-        state.pages.push({ page, w: vp.width, h: vp.height, el, canvas: null, task: null, rendering: 0, renderedScale: 0, visible: false, cssW: 0, cssH: 0 });
-        frag.appendChild(el);
-        if (n % 25 === 0) els.loadingText.textContent = `Reading page ${n} of ${pdf.numPages}…`;
-      }
-      els.pages.appendChild(frag);
-
-      els.loadingText.textContent = 'Measuring line spacing…';
-      state.linePt = await detectLineHeight(pdf);
-
-      els.fileName.textContent = file.name.replace(/\.pdf$/i, '');
-      document.title = `${els.fileName.textContent} · Scrollstand`;
-      document.body.classList.add('has-pdf');
-      layout(false);
-
-      const saved = store.get(state.fileKey, null);
-      if (saved && (saved.i > 0 || saved.f > 0.02)) {
-        restoreAnchor(saved);
-        toast(`Picked up where you left off, page ${Math.min(saved.i, state.pages.length - 1) + 1}`);
-      } else {
-        els.viewer.scrollTop = 0;
-        state.pos = state.expected = 0;
-      }
-      state.pages.forEach((p) => observer.observe(p.el));
-      syncUI();
-      if (!store.get('scrollstand:seenTapHint', false)) {
-        setTimeout(() => toast('Tip: tap the page to hide or show the controls', 3500), 2800);
-        store.set('scrollstand:seenTapHint', true);
-      }
+      meta.opened = Date.now();
+      await keepInLibrary(meta, bytes, !!existing);
+      await openBook(meta, bytes);
     } catch (err) {
-      console.error(err);
-      const msg = err && err.name === 'PasswordException'
-        ? 'This PDF needs a password to open.'
-        : 'This PDF could not be opened. The file may be damaged.';
-      toast(msg, 3500);
+      if (!(err instanceof UserError)) console.error(err);
+      toast(err instanceof UserError ? err.message : 'This file couldn’t be opened. It may be damaged.', 4000);
     } finally {
-      document.body.classList.remove('loading');
+      setLoading(false);
       els.fileInput.value = '';
     }
+  }
+
+  async function openFromLibrary(id) {
+    pause();
+    setLoading('Opening…');
+    try {
+      const [meta, blob] = await Promise.all([DB.get('books', id), DB.get('files', id)]);
+      if (!meta || !blob) {
+        await removeBook(id);
+        throw new UserError('That file is no longer saved on this device. Open it again from your files.');
+      }
+      meta.opened = Date.now();
+      DB.put('books', meta).catch(() => {});
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      await openBook(meta, bytes);
+    } catch (err) {
+      console.error(err);
+      toast(err instanceof UserError ? err.message : 'This file couldn’t be opened.', 4000);
+      renderLibrary();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function openBook(meta, bytes) {
+    closeDoc();
+    const doc = { id: meta.id, kind: meta.kind, meta, pdf: null, pageCount: 0, text: null };
+    if (meta.kind === 'pdf') {
+      await loadPdf(doc, bytes);
+    } else {
+      setLoading('Preparing text…');
+      doc.text = meta.kind === 'docx' ? await docxToHtml(bytes, meta.id) : textToHtml(decodeText(bytes));
+    }
+    state.doc = doc;
+    els.fileName.textContent = meta.name;
+    document.title = `${meta.name} · Scrollstand`;
+    document.body.classList.add('has-doc');
+    document.body.dataset.kind = meta.kind;
+
+    let view = meta.kind === 'pdf' ? (meta.view || 'pages') : 'text';
+    if (view === 'text' && !(await ensurePdfText(doc))) view = 'pages';
+    setLoading(false);
+    await showView(view, targetFromMeta(meta, view));
+
+    if (meta.progress > 0.01 && meta.progress < 0.995) {
+      const where = meta.kind === 'pdf' && meta.page != null ? `page ${meta.page + 1}` : `${Math.round(meta.progress * 100)}%`;
+      toast(`Picked up where you left off, ${where}`);
+    } else if (!store.get('scrollstand:seenTapHint', false)) {
+      setTimeout(() => toast('Tip: tap the page to hide or show the controls', 3500), 1500);
+      store.set('scrollstand:seenTapHint', true);
+    }
+    renderRecent();
+    syncUI();
+  }
+
+  function closeDoc() {
+    pause();
+    // Save where the current file was left before it goes away
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    saveProgress();
+    observer.disconnect();
+    state.pages.forEach(releasePage);
+    els.pages.replaceChildren();
+    els.flow.replaceChildren();
+    delete els.flow.dataset.doc;
+    if (state.doc && state.doc.pdf) state.doc.pdf.destroy();
+    state.doc = null;
+    state.pages = []; state.tops = [];
+    state.blocks = []; state.btops = []; state.pageFirst = [];
+    state.timerLeft = 0;
+    document.body.classList.remove('has-doc', 'immersive');
+    delete document.body.dataset.kind;
+    els.fileName.textContent = 'Scrollstand';
+    document.title = 'Scrollstand';
+  }
+
+  async function loadPdf(doc, bytes) {
+    const task = pdfjsLib.getDocument({ data: bytes });
+    task.onPassword = (update, reason) => {
+      const again = reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD;
+      const pw = prompt(again ? 'That password didn’t work. Try again:' : 'This PDF is password-protected. Enter the password:');
+      if (pw === null) task.destroy(); else update(pw);
+    };
+    let pdf;
+    try {
+      pdf = await task.promise;
+    } catch (err) {
+      if (err && err.name === 'PasswordException') throw new UserError('This PDF needs a password to open.');
+      throw err;
+    }
+    doc.pdf = pdf;
+    doc.pageCount = pdf.numPages;
+    const frag = document.createDocumentFragment();
+    const pages = [];
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const page = await pdf.getPage(n);
+      const vp = page.getViewport({ scale: 1 });
+      const el = document.createElement('div');
+      el.className = 'page';
+      el.dataset.i = n - 1;
+      el.setAttribute('aria-label', `Page ${n}`);
+      pages.push({ page, w: vp.width, h: vp.height, el, canvas: null, task: null, rendering: 0, renderedScale: 0, visible: false, cssW: 0, cssH: 0 });
+      frag.appendChild(el);
+      if (n % 25 === 0) setLoading(`Reading page ${n} of ${pdf.numPages}…`);
+    }
+    state.pages = pages;
+    els.pages.appendChild(frag);
+    setLoading('Measuring line spacing…');
+    state.linePt = await detectLineHeight(pdf);
+    pages.forEach((p) => observer.observe(p.el));
   }
 
   // Estimate the typical distance between text lines (in PDF points)
@@ -608,18 +961,239 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     return median(lineGaps) || fs * 1.2;
   }
 
-  // ---------- Layout & rendering ----------
-  const observer = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      const p = state.pages[+e.target.dataset.i];
-      if (!p) continue;
-      p.visible = e.isIntersecting;
-      if (p.visible) renderPage(p); else releasePage(p);
+  // ---------- Building text view content ----------
+  async function ensurePdfText(doc) {
+    if (doc.text !== null) return !!doc.text;
+    const key = `${doc.id}:text`;
+    const cached = await DB.get('renders', key).catch(() => undefined);
+    if (typeof cached === 'string') {
+      doc.text = cached;
+    } else {
+      setLoading('Preparing text view…');
+      doc.text = await pdfToHtml(doc.pdf);
+      DB.put('renders', doc.text, key).catch(() => {});
     }
-  }, { root: els.viewer, rootMargin: '150% 0px 150% 0px' });
+    if (!doc.text) toast('This PDF has no selectable text (it may be scanned), so text view isn’t available.', 4000);
+    return !!doc.text;
+  }
 
+  function linesFromItems(items) {
+    const lines = [];
+    let cur = null;
+    for (const it of items) {
+      if (!('str' in it) || !it.transform) continue;
+      const tr = it.transform;
+      const fs = Math.hypot(tr[2], tr[3]) || Math.abs(tr[0]) || 10;
+      const x = tr[4], y = tr[5];
+      if (!it.str) { if (it.hasEOL && cur) cur.eol = true; continue; }
+      const sameLine = cur && !cur.eol && Math.abs(y - cur.y) < Math.max(cur.fs, fs) * 0.5;
+      if (!sameLine) {
+        if (cur) lines.push(cur);
+        cur = { text: '', y, fs, xEnd: x, eol: false };
+      }
+      if (cur.text && !/\s$/.test(cur.text) && !/^\s/.test(it.str) && x - cur.xEnd > fs * 0.15) cur.text += ' ';
+      cur.text += it.str;
+      cur.xEnd = x + (it.width || 0);
+      cur.fs = Math.max(cur.fs, fs);
+      if (it.hasEOL) cur.eol = true;
+    }
+    if (cur) lines.push(cur);
+    return lines
+      .map((l) => ({ text: l.text.replace(/\s+/g, ' ').trim(), y: l.y, fs: l.fs }))
+      .filter((l) => l.text);
+  }
+
+  async function pdfToHtml(pdf) {
+    const pages = [];
+    for (let n = 1; n <= pdf.numPages; n++) {
+      try {
+        const page = await pdf.getPage(n);
+        const tc = await page.getTextContent();
+        pages.push(linesFromItems(tc.items));
+      } catch {
+        pages.push([]);
+      }
+      if (n % 5 === 0) setLoading(`Preparing text view… page ${n} of ${pdf.numPages}`);
+    }
+    const all = pages.flat();
+    if (!all.length) return '';
+    const bodyFs = median(all.map((l) => l.fs));
+    const gaps = [];
+    for (const lines of pages) {
+      for (let k = 1; k < lines.length; k++) {
+        const g = lines[k - 1].y - lines[k].y;
+        if (g >= bodyFs * 0.8 && g <= bodyFs * 2.5) gaps.push(g);
+      }
+    }
+    const lineGap = median(gaps) || bodyFs * 1.2;
+    const pageNumber = /^(page\s*)?\d{1,4}(\s*(of|\/)\s*\d{1,4})?$/i;
+
+    const out = [];
+    pages.forEach((lines, idx) => {
+      const n = idx + 1;
+      out.push(`<div class="pgmark" data-page="${n}">Page ${n}</div>`);
+      const kept = lines.filter((l, k) => !((k === 0 || k === lines.length - 1) && pageNumber.test(l.text)));
+      let para = null, prev = null;
+      const flush = () => {
+        if (!para) return;
+        const tag = para.big ? 'h3' : 'p';
+        out.push(`<${tag} data-page="${n}">${esc(para.text)}</${tag}>`);
+        para = null;
+      };
+      for (const line of kept) {
+        const big = line.fs > bodyFs * 1.25;
+        const gap = prev ? prev.y - line.y : 0;
+        const breakHere = !para || big !== para.big || gap > lineGap * 1.45 || gap < -lineGap * 0.5;
+        if (breakHere) {
+          flush();
+          para = { big, text: line.text };
+        } else if (/[a-z\u00C0-\u024F]-$/.test(para.text) && /^[a-z\u00DF-\u00FF]/.test(line.text)) {
+          para.text = para.text.slice(0, -1) + line.text; // re-join a hyphenated word
+        } else {
+          para.text += ' ' + line.text;
+        }
+        prev = line;
+      }
+      flush();
+    });
+    return out.join('');
+  }
+
+  function textToHtml(str) {
+    str = str.replace(/\r\n?/g, '\n');
+    const lines = str.split('\n').filter((l) => l.trim());
+    // Hard-wrapped text (lines cut at ~70 characters) reads better re-flowed
+    const wrapped = lines.length > 20 && lines.filter((l) => l.length >= 50 && l.length <= 85).length / lines.length > 0.55;
+    const html = str.split(/\n[ \t]*\n/).map((p) => {
+      p = p.replace(/^\n+/, '').replace(/\s+$/, '');
+      if (!p.trim()) return '';
+      return wrapped ? `<p>${esc(p.replace(/\s*\n\s*/g, ' ').trim())}</p>` : `<p class="pre">${esc(p)}</p>`;
+    }).join('');
+    return html || '<p>This file is empty.</p>';
+  }
+
+  let mammothPromise = null;
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => { s.remove(); reject(new Error(`Could not load ${src}`)); };
+      document.head.appendChild(s);
+    });
+  }
+  function getMammoth() {
+    if (!mammothPromise) {
+      mammothPromise = loadScript('lib/mammoth.browser.min.js')
+        .catch(() => loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.12.3/mammoth.browser.min.js'))
+        .then(() => {
+          if (!window.mammoth) throw new Error('mammoth missing');
+          return window.mammoth;
+        })
+        .catch((err) => { mammothPromise = null; throw err; });
+    }
+    return mammothPromise;
+  }
+
+  async function docxToHtml(bytes, id) {
+    const key = `${id}:text`;
+    const cached = await DB.get('renders', key).catch(() => undefined);
+    if (typeof cached === 'string') return cached;
+    let mammoth;
+    try {
+      mammoth = await getMammoth();
+    } catch {
+      throw new UserError('The Word reader didn’t load. Check your connection and try again.');
+    }
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
+    const html = sanitizeHtml(result.value) || '<p>This document has no text.</p>';
+    DB.put('renders', html, key).catch(() => {});
+    return html;
+  }
+
+  function sanitizeHtml(html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const root = tpl.content;
+    root.querySelectorAll('script, style, iframe, object, embed, link, meta, form, input, button').forEach((n) => n.remove());
+    for (const el of root.querySelectorAll('*')) {
+      for (const attr of [...el.attributes]) {
+        const name = attr.name.toLowerCase();
+        const value = attr.value.trim();
+        if (name.startsWith('on') || name === 'style') el.removeAttribute(attr.name);
+        else if ((name === 'href' || name === 'src') && !/^(https?:|mailto:|#|data:image\/)/i.test(value)) el.removeAttribute(attr.name);
+      }
+    }
+    root.querySelectorAll('table').forEach((t) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'table-wrap';
+      t.replaceWith(wrap);
+      wrap.appendChild(t);
+    });
+    // Everything at the top level must be a block so positions can be tracked
+    const box = document.createElement('div');
+    let loose = null;
+    for (const node of [...root.childNodes]) {
+      const isBlock = node.nodeType === 1 && /^(P|H[1-6]|UL|OL|DIV|BLOCKQUOTE|PRE|HR|FIGURE)$/.test(node.tagName);
+      if (isBlock) { loose = null; box.appendChild(node); continue; }
+      if (node.nodeType === 3 && !node.textContent.trim()) continue;
+      if (!loose) { loose = document.createElement('p'); box.appendChild(loose); }
+      loose.appendChild(node);
+    }
+    return box.innerHTML;
+  }
+
+  // ---------- Views ----------
+  function targetFromMeta(meta, view) {
+    if (meta.anchor && meta.anchor.view === view) return { type: 'anchor', anchor: meta.anchor };
+    if (meta.kind === 'pdf' && meta.page != null) return { type: 'page', i: meta.page, f: meta.pageFrac || 0 };
+    if (meta.progress) return { type: 'progress', p: meta.progress };
+    return null;
+  }
+
+  async function showView(view, target) {
+    state.view = view;
+    document.body.classList.toggle('view-text', view === 'text');
+    document.body.classList.toggle('view-pages', view === 'pages');
+    if (view === 'text' && els.flow.dataset.doc !== state.doc.id) {
+      els.flow.innerHTML = state.doc.text;
+      els.flow.dataset.doc = state.doc.id;
+    }
+    layout(false);
+    applyTarget(target);
+    updateReadouts(true);
+  }
+
+  async function setView(view) {
+    const doc = state.doc;
+    if (!doc || doc.kind !== 'pdf' || view === state.view) return;
+    const target = { type: 'page', ...pageAtRead() };
+    if (view === 'text') {
+      const ok = await ensurePdfText(doc);
+      setLoading(false);
+      if (!ok) { syncUI(); return; }
+    }
+    doc.meta.view = view;
+    await showView(view, target);
+    saveProgress();
+    syncUI();
+  }
+
+  function applyTarget(t) {
+    const v = els.viewer;
+    v.scrollLeft = 0;
+    if (!t) v.scrollTop = 0;
+    else if (t.type === 'anchor') restoreAnchor(t.anchor);
+    else if (t.type === 'page') scrollToPage(t.i, t.f || 0);
+    else if (t.type === 'progress') v.scrollTop = Math.max(0, state.padTop + t.p * (docEnd() - state.padTop) - state.padTop);
+    if (state.view === 'pages') v.scrollLeft = (v.scrollWidth - v.clientWidth) / 2;
+    state.pos = state.expected = v.scrollTop;
+  }
+
+  // ---------- Layout ----------
   function layout(keep = true) {
-    if (!state.pages.length) return;
+    if (!state.doc) return;
     const anchor = keep ? getAnchor() : null;
     const v = els.viewer;
     const preview = !!document.body.dataset.preview;
@@ -627,14 +1201,27 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     const vh = v.clientHeight;
     state.guideTop = Math.round(state.ins.top + (vh - state.ins.top - state.ins.bottom) * 0.3);
     state.padTop = settings.guide ? state.guideTop : state.ins.top + GAP;
+    const padBottom = Math.round(vh * 0.75);
 
+    if (state.view === 'text') layoutText(padBottom); else layoutPages(padBottom);
+
+    const lp = linePx();
+    els.frame.style.setProperty('--guide-top', (state.guideTop - lp * 0.5) + 'px');
+    els.frame.style.setProperty('--guide-h', (lp * 2.2) + 'px');
+
+    if (anchor) restoreAnchor(anchor);
+    if (state.view === 'pages') for (const p of state.pages) if (p.visible) renderPage(p);
+    updateReadouts(true);
+    syncLineHint();
+  }
+
+  function layoutPages(padBottom) {
     let maxW = 0;
     for (const p of state.pages) maxW = Math.max(maxW, p.w);
-    const avail = Math.max(120, v.clientWidth - GAP * 2);
+    const avail = Math.max(120, els.viewer.clientWidth - GAP * 2);
     state.scale = (avail / maxW) * settings.zoom;
-
     els.pages.style.paddingTop = state.padTop + 'px';
-    els.pages.style.paddingBottom = Math.round(vh * 0.75) + 'px';
+    els.pages.style.paddingBottom = padBottom + 'px';
     for (const p of state.pages) {
       p.cssW = Math.floor(p.w * state.scale);
       p.cssH = Math.floor(p.h * state.scale);
@@ -642,23 +1229,41 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
       p.el.style.height = p.cssH + 'px';
     }
     state.tops = state.pages.map((p) => p.el.offsetTop);
+  }
 
-    const lp = linePx();
-    els.frame.style.setProperty('--guide-top', (state.guideTop - lp * 0.5) + 'px');
-    els.frame.style.setProperty('--guide-h', (lp * 2.2) + 'px');
-
-    if (anchor) restoreAnchor(anchor);
-    for (const p of state.pages) if (p.visible) renderPage(p);
-    updateReadouts(true);
-    syncLineHint();
+  function layoutText(padBottom) {
+    const f = els.flow;
+    els.flowWrap.style.paddingTop = state.padTop + 'px';
+    els.flowWrap.style.paddingBottom = padBottom + 'px';
+    f.style.setProperty('--fs', textFontPx() + 'px');
+    f.style.setProperty('--lh', settings.lineHeight);
+    f.style.fontFamily = FONTS[settings.font].stack;
+    state.blocks = Array.from(f.children);
+    state.btops = state.blocks.map((b) => b.offsetTop);
+    state.flowEnd = f.offsetTop + f.offsetHeight;
+    state.pageFirst = [];
+    state.blocks.forEach((b, idx) => {
+      const p = +b.dataset.page;
+      if (p && state.pageFirst[p - 1] == null) state.pageFirst[p - 1] = idx;
+    });
   }
 
   let layoutTimer;
   const scheduleLayout = () => { clearTimeout(layoutTimer); layoutTimer = setTimeout(() => layout(true), 110); };
 
+  // ---------- PDF page rendering ----------
+  const observer = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const p = state.pages[+e.target.dataset.i];
+      if (!p || p.el !== e.target) continue;
+      p.visible = e.isIntersecting;
+      if (p.visible) renderPage(p); else releasePage(p);
+    }
+  }, { root: els.viewer, rootMargin: '150% 0px 150% 0px' });
+
   async function renderPage(p) {
     const scale = state.scale;
-    if (p.renderedScale === scale || p.rendering === scale) return;
+    if (!p.cssW || p.renderedScale === scale || p.rendering === scale) return;
     if (p.task) { p.task.cancel(); p.task = null; }
     // Sharp on high-density screens, but capped to protect phone memory
     let out = Math.min(window.devicePixelRatio || 1, 2);
@@ -681,7 +1286,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     if (p.task !== task) return;
     p.task = null;
     p.rendering = 0;
-    if (!p.visible) { canvas.width = canvas.height = 0; return; }
+    if (!p.visible || !p.el.isConnected) { canvas.width = canvas.height = 0; return; }
     if (p.canvas) { p.canvas.width = p.canvas.height = 0; p.canvas.remove(); }
     p.el.appendChild(canvas);
     p.canvas = canvas;
@@ -695,29 +1300,88 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     p.renderedScale = 0;
   }
 
-  function pageIndexAt(y) {
-    const t = state.tops;
-    let lo = 0, hi = t.length - 1, r = 0;
+  // ---------- Positions ----------
+  function lastLE(arr, y) {
+    let lo = 0, hi = arr.length - 1, r = 0;
     while (lo <= hi) {
       const m = (lo + hi) >> 1;
-      if (t[m] <= y) { r = m; lo = m + 1; } else hi = m - 1;
+      if (arr[m] <= y) { r = m; lo = m + 1; } else hi = m - 1;
     }
     return r;
   }
-  function getAnchor() {
+  const blockHeight = (b) => (b + 1 < state.btops.length ? state.btops[b + 1] : state.flowEnd) - state.btops[b];
+
+  // A position in the document that survives zoom, font and size changes
+  function pointAnchor(x, y) {
+    if (state.view === 'text') {
+      if (!state.btops.length) return null;
+      const b = lastLE(state.btops, y);
+      return { view: 'text', b, fy: clamp((y - state.btops[b]) / Math.max(1, blockHeight(b)), 0, 1) };
+    }
     if (!state.tops.length) return null;
-    const y = els.viewer.scrollTop + state.padTop;
-    const i = pageIndexAt(y);
-    return { i, f: Math.max(0, (y - state.tops[i]) / (state.pages[i].cssH + GAP)) };
+    const i = lastLE(state.tops, y);
+    const p = state.pages[i];
+    return {
+      view: 'pages', i,
+      fy: Math.max(0, (y - state.tops[i]) / (p.cssH + GAP)),
+      fx: clamp((x - p.el.offsetLeft) / Math.max(1, p.cssW), 0, 1),
+    };
   }
-  function restoreAnchor(a) {
-    const i = clamp(a.i | 0, 0, state.pages.length - 1);
-    const y = state.tops[i] + a.f * (state.pages[i].cssH + GAP) - state.padTop;
-    els.viewer.scrollTop = Math.max(0, y);
+  function restorePoint(a, my, mx) {
+    const v = els.viewer;
+    if (!a || a.view !== state.view) return;
+    if (a.view === 'text') {
+      if (!state.btops.length) return;
+      const b = clamp(a.b | 0, 0, state.btops.length - 1);
+      v.scrollTop = Math.max(0, state.btops[b] + a.fy * blockHeight(b) - my);
+    } else {
+      if (!state.tops.length) return;
+      const i = clamp(a.i | 0, 0, state.pages.length - 1);
+      const p = state.pages[i];
+      v.scrollTop = Math.max(0, state.tops[i] + a.fy * (p.cssH + GAP) - my);
+      if (mx !== undefined && a.fx !== undefined) v.scrollLeft = p.el.offsetLeft + a.fx * p.cssW - mx;
+    }
+    state.pos = state.expected = v.scrollTop;
+  }
+  const getAnchor = () => pointAnchor(els.viewer.scrollLeft, els.viewer.scrollTop + state.padTop);
+  const restoreAnchor = (a) => restorePoint(a, state.padTop);
+
+  function nextPageFirst(p) {
+    for (let q = p + 1; q < state.pageFirst.length; q++) if (state.pageFirst[q] != null) return state.pageFirst[q];
+    return state.blocks.length;
+  }
+  // Page (0-based) and how far into it the reading point is; PDFs only
+  function pageAtRead() {
+    const y = els.viewer.scrollTop + state.padTop;
+    if (state.view === 'pages') {
+      const a = pointAnchor(0, y);
+      return a ? { i: a.i, f: clamp(a.fy, 0, 1) } : { i: 0, f: 0 };
+    }
+    if (!state.blocks.length) return { i: 0, f: 0 };
+    const b = lastLE(state.btops, y);
+    const p = Math.max(0, (+state.blocks[b].dataset.page || 1) - 1);
+    const b0 = state.pageFirst[p] ?? b;
+    const b1 = nextPageFirst(p);
+    const y0 = state.btops[b0];
+    const y1 = b1 < state.btops.length ? state.btops[b1] : state.flowEnd;
+    return { i: p, f: clamp((y - y0) / Math.max(1, y1 - y0), 0, 1) };
+  }
+  function scrollToPage(i, f) {
+    if (state.view === 'pages') { restoreAnchor({ view: 'pages', i, fy: f }); return; }
+    let b0 = null;
+    for (let q = Math.min(i, state.pageFirst.length - 1); q >= 0; q--) {
+      if (state.pageFirst[q] != null) { b0 = state.pageFirst[q]; i = q; break; }
+    }
+    if (b0 == null) { els.viewer.scrollTop = 0; return; }
+    const b1 = nextPageFirst(i);
+    const y0 = state.btops[b0];
+    const y1 = b1 < state.btops.length ? state.btops[b1] : state.flowEnd;
+    els.viewer.scrollTop = Math.max(0, y0 + f * (y1 - y0) - state.padTop);
     state.pos = state.expected = els.viewer.scrollTop;
   }
 
   function docEnd() {
+    if (state.view === 'text') return state.flowEnd;
     const last = state.pages.length - 1;
     return last < 0 ? 0 : state.tops[last] + state.pages[last].cssH;
   }
@@ -728,6 +1392,12 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   function atEnd(pos) {
     const v = els.viewer;
     return pos >= v.scrollHeight - v.clientHeight - 0.5 || docEnd() <= pos + readPoint();
+  }
+  function progress() {
+    if (!state.doc) return 0;
+    const top = els.viewer.scrollTop;
+    if (atEnd(top)) return 1;
+    return clamp(top / Math.max(1, docEnd() - state.padTop), 0, 1);
   }
 
   // ---------- Scrolling engine ----------
@@ -744,8 +1414,8 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     state.last = t;
     const v = els.viewer;
 
-    if (state.holding || t < state.holdUntil) {
-      // The reader is touching or flicking the page: follow them
+    if (state.holding || gesture.active || t < state.holdUntil) {
+      // The reader is touching, flicking or zooming: follow them
       state.anim = null;
       state.pos = state.expected = v.scrollTop;
     } else {
@@ -785,7 +1455,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   }
 
   function stepLines(n) {
-    if (!state.pdf) return;
+    if (!state.doc) return;
     if (!state.raf) state.pos = els.viewer.scrollTop;
     state.holdUntil = 0;
     const rest = state.anim ? (1 - state.anim.done) * state.anim.dist : 0;
@@ -805,8 +1475,8 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   }
 
   function play() {
-    if (!state.pdf) { els.fileInput.click(); return; }
-    if (atEnd(els.viewer.scrollTop)) { els.viewer.scrollTop = 0; }
+    if (!state.doc) { openLibraryOrPicker(); return; }
+    if (atEnd(els.viewer.scrollTop)) els.viewer.scrollTop = 0;
     if (settings.stopAfter > 0 && state.timerLeft <= 0) state.timerLeft = settings.stopAfter * 60;
     if (!isNative && coarse && settings.orientation !== 'auto' && !state.locked) setOrientation(settings.orientation, { quiet: true });
     if (settings.delay > 0) startCountdown(settings.delay); else begin();
@@ -829,7 +1499,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     document.body.classList.remove('playing');
     els.play.title = els.play.ariaLabel = 'Play';
     releaseWake();
-    savePosition();
+    saveProgress();
     updateReadouts(true);
   }
 
@@ -871,29 +1541,92 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     if (state.wake) { state.wake.release().catch(() => {}); state.wake = null; }
   }
 
+  // ---------- Zooming (pinch, trackpad, buttons) ----------
+  const gesture = { active: false, s: 1, wheel: 1, timer: 0, d0: 1 };
+  const zoomTarget = () => (state.view === 'text' ? els.flowWrap : els.pages);
+
+  function gestureStart(mx, my) {
+    const v = els.viewer;
+    gesture.active = true;
+    gesture.s = 1;
+    gesture.wheel = 1;
+    gesture.mx0 = gesture.mx = mx;
+    gesture.my0 = gesture.my = my;
+    const cx = v.scrollLeft + mx, cy = v.scrollTop + my;
+    gesture.anchor = pointAnchor(cx, cy);
+    const el = zoomTarget();
+    el.style.transformOrigin = `${cx}px ${cy}px`;
+    el.style.willChange = 'transform';
+    state.anim = null;
+    document.body.classList.add('pinching');
+  }
+  function gestureUpdate(s, mx, my) {
+    const [lo, hi] = zoomLimits();
+    const z = settings[zoomKey()];
+    gesture.s = clamp(s, lo / z, hi / z);
+    gesture.mx = mx;
+    gesture.my = my;
+    zoomTarget().style.transform = `translate(${mx - gesture.mx0}px, ${my - gesture.my0}px) scale(${gesture.s})`;
+  }
+  function gestureEnd() {
+    if (!gesture.active) return;
+    gesture.active = false;
+    clearTimeout(gesture.timer);
+    document.body.classList.remove('pinching');
+    const el = zoomTarget();
+    el.style.transform = '';
+    el.style.willChange = '';
+    if (Math.abs(gesture.s - 1) < 0.01) return;
+    const [lo, hi] = zoomLimits();
+    const key = zoomKey();
+    settings[key] = clamp(Math.round(settings[key] * gesture.s * 100) / 100, lo, hi);
+    saveSettings();
+    layout(false);
+    restorePoint(gesture.anchor, gesture.my, state.view === 'pages' ? gesture.mx : undefined);
+    state.holdUntil = performance.now() + 150;
+    syncUI();
+    saveProgressSoon();
+  }
+
+  function setZoom(z) {
+    if (!state.doc) { setZoomFor(zoomKey(), z); return; }
+    const [lo, hi] = zoomLimits();
+    const key = zoomKey();
+    const next = clamp(Math.round(z * 10) / 10, lo, hi);
+    if (next === settings[key]) return;
+    settings[key] = next;
+    saveSettings();
+    layout(true);
+    if (state.view === 'pages') {
+      const v = els.viewer;
+      v.scrollLeft = (v.scrollWidth - v.clientWidth) / 2;
+    }
+    syncUI();
+  }
+
   // ---------- Readouts ----------
   let lastReadout = 0;
   function updateReadouts(force) {
     const v = els.viewer;
-    const max = v.scrollHeight - v.clientHeight;
-    els.progressBar.style.transform = `scaleX(${state.pdf && max > 0 ? clamp(v.scrollTop / max, 0, 1) : 0})`;
+    els.progressBar.style.transform = `scaleX(${state.doc ? progress() : 0})`;
     const now = performance.now();
     if (!force && now - lastReadout < 250) return;
     lastReadout = now;
-    if (state.pdf && state.tops.length) {
-      const i = pageIndexAt(v.scrollTop + state.padTop);
-      els.pageInfo.textContent = `Page ${i + 1} of ${state.pages.length}`;
-    } else {
+    if (!state.doc) {
       els.pageInfo.textContent = '';
+    } else if (state.doc.kind === 'pdf') {
+      els.pageInfo.textContent = `Page ${pageAtRead().i + 1} of ${state.doc.pageCount}`;
+    } else {
+      els.pageInfo.textContent = `${Math.round(progress() * 100)}% read`;
     }
-    els.status.textContent = statusText();
+    els.status.textContent = statusText(v);
   }
 
-  function statusText() {
+  function statusText(v) {
     if (state.countdown) return 'Starting…';
-    if (!state.pdf) return settings.stopAfter > 0 ? `Stops after ${settings.stopAfter} min` : '';
+    if (!state.doc) return settings.stopAfter > 0 ? `Stops after ${settings.stopAfter} min` : '';
     const parts = [];
-    const rem = Math.max(0, docEnd() - (els.viewer.scrollTop + readPoint()));
+    const rem = Math.max(0, docEnd() - (v.scrollTop + readPoint()));
     parts.push(`${fmtTime(rem / pxPerSec())} to the end`);
     if (settings.stopAfter > 0) {
       parts.push(`stops in ${fmtTime(state.timerLeft > 0 ? state.timerLeft : settings.stopAfter * 60)}`);
@@ -902,13 +1635,149 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
-  let saveTimer;
-  function savePosition() {
-    if (!state.fileKey || !state.tops.length) return;
-    const a = getAnchor();
-    if (a) store.set(state.fileKey, a);
+  // ---------- Library & history ----------
+  async function keepInLibrary(meta, bytes, known) {
+    try {
+      const stored = known ? await DB.get('files', meta.id) : null;
+      if (!stored) await DB.put('files', new Blob([bytes], { type: MIME[meta.kind] }), meta.id);
+      await DB.put('books', meta);
+      await evict(meta.id);
+    } catch (err) {
+      console.warn(err);
+      meta.unsaved = true;
+      toast('There isn’t room to keep a copy on this device, so this file won’t be in your library.', 4000);
+    }
   }
-  const savePositionSoon = () => { clearTimeout(saveTimer); saveTimer = setTimeout(savePosition, 500); };
+
+  async function evict(keepId) {
+    const books = await DB.all('books');
+    let total = books.reduce((sum, b) => sum + (b.size || 0), 0);
+    let count = books.length;
+    books.sort((a, b) => a.opened - b.opened);
+    for (const b of books) {
+      if (count <= MAX_BOOKS && total <= MAX_BYTES) break;
+      if (b.id === keepId) continue;
+      await removeBook(b.id);
+      count--;
+      total -= b.size || 0;
+    }
+  }
+
+  async function removeBook(id) {
+    await Promise.all([
+      DB.del('books', id), DB.del('files', id), DB.del('renders', `${id}:text`),
+    ]).catch(() => {});
+    if (state.doc && state.doc.id === id) state.doc.meta.unsaved = true;
+  }
+
+  async function saveProgress() {
+    const doc = state.doc;
+    if (!doc || doc.meta.unsaved) return;
+    const m = doc.meta;
+    m.opened = Date.now();
+    m.progress = progress();
+    m.view = state.view;
+    const a = getAnchor();
+    if (a) m.anchor = a;
+    if (doc.kind === 'pdf') {
+      const pg = pageAtRead();
+      m.page = pg.i;
+      m.pageFrac = pg.f;
+      m.pages = doc.pageCount;
+    }
+    await DB.put('books', m).catch(() => {});
+  }
+  let saveTimer = null;
+  function saveProgressSoon() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => { saveTimer = null; saveProgress(); }, 3000);
+  }
+
+  function bookMeta(b) {
+    const parts = [];
+    if (b.kind === 'pdf' && b.pages) parts.push(b.progress >= 0.995 ? 'Finished' : `Page ${(b.page || 0) + 1} of ${b.pages}`);
+    else parts.push(b.progress >= 0.995 ? 'Finished' : `${Math.round((b.progress || 0) * 100)}% read`);
+    parts.push(relTime(b.opened));
+    parts.push(fmtBytes(b.size || 0));
+    return parts.join(' · ');
+  }
+
+  function bookRow(b, withDelete) {
+    const li = document.createElement('li');
+    li.className = 'book';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'book-open';
+    open.dataset.open = b.id;
+    open.innerHTML = `
+      <span class="badge ${b.kind}">${b.kind.toUpperCase()}</span>
+      <span class="book-main">
+        <span class="book-title"></span>
+        <span class="book-meta"></span>
+        <span class="bar"><i style="width:${Math.round((b.progress || 0) * 100)}%"></i></span>
+      </span>`;
+    open.querySelector('.book-title').textContent = b.name;
+    open.querySelector('.book-meta').textContent = bookMeta(b);
+    li.appendChild(open);
+    if (withDelete) {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn book-del';
+      del.dataset.remove = b.id;
+      del.title = 'Remove from library';
+      del.setAttribute('aria-label', `Remove ${b.name} from library`);
+      del.innerHTML = '<svg class="i"><use href="#i-trash"/></svg>';
+      li.appendChild(del);
+    }
+    return li;
+  }
+
+  async function allBooks() {
+    const books = await DB.all('books').catch(() => []);
+    return books.sort((a, b) => b.opened - a.opened);
+  }
+
+  async function renderLibrary() {
+    const books = await allBooks();
+    els.bookList.replaceChildren(...books.map((b) => bookRow(b, true)));
+    els.libEmpty.hidden = books.length > 0;
+    els.libFoot.hidden = books.length === 0;
+    const total = books.reduce((sum, b) => sum + (b.size || 0), 0);
+    els.libUsage.textContent = `${books.length} ${books.length === 1 ? 'file' : 'files'}, ${fmtBytes(total)} on this device`;
+  }
+
+  async function renderRecent() {
+    const books = (await allBooks()).slice(0, 3);
+    els.recentList.replaceChildren(...books.map((b) => bookRow(b, false)));
+    els.recent.hidden = books.length === 0;
+  }
+
+  function openLibrary() {
+    renderLibrary();
+    if (!els.library.open) els.library.showModal();
+  }
+  function openLibraryOrPicker() {
+    allBooks().then((books) => (books.length ? openLibrary() : els.fileInput.click()));
+  }
+
+  async function onBookListClick(e) {
+    const openBtn = e.target.closest('[data-open]');
+    const removeBtn = e.target.closest('[data-remove]');
+    if (openBtn) {
+      if (els.library.open) els.library.close();
+      const id = openBtn.dataset.open;
+      if (state.doc && state.doc.id === id) return;
+      await saveProgress();
+      openFromLibrary(id);
+    } else if (removeBtn) {
+      const id = removeBtn.dataset.remove;
+      const book = await DB.get('books', id).catch(() => null);
+      if (!confirm(`Remove “${book ? book.name : 'this file'}” from your library? Your reading position will be forgotten.`)) return;
+      await removeBook(id);
+      renderLibrary();
+      renderRecent();
+    }
+  }
 
   // ---------- Settings actions ----------
   function setSpeed(s) {
@@ -921,18 +1790,6 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     const step = s < 20 ? 1 : s < 60 ? 2 : 5;
     setSpeed(s + dir * step);
   }
-
-  function setZoom(z) {
-    const old = settings.zoom;
-    settings.zoom = clamp(Math.round(z * 10) / 10, 0.5, 3);
-    if (settings.zoom === old) return;
-    saveSettings();
-    layout(true);
-    const v = els.viewer;
-    v.scrollLeft = (v.scrollWidth - v.clientWidth) / 2;
-    syncUI();
-  }
-
   function setGuide(on) {
     settings.guide = on;
     document.body.classList.toggle('guide-on', on);
@@ -940,9 +1797,15 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     layout(true);
     syncUI();
   }
-
   function setLineFactor(f) {
     settings.lineFactor = clamp(f, 0.5, 2.5);
+    saveSettings();
+    layout(true);
+    syncUI();
+  }
+  function setFont(key) {
+    if (!FONTS[key]) return;
+    settings.font = key;
     saveSettings();
     layout(true);
     syncUI();
@@ -964,7 +1827,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
       state.locked = mode !== 'auto';
       delete document.body.dataset.preview;
     } else if (coarse && so) {
-      // Real devices: lock the screen (browsers need full screen for this)
+      // Phone browsers: lock the screen (needs full screen)
       try {
         if (mode === 'auto') {
           if (so.unlock) so.unlock();
@@ -1023,7 +1886,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   }
 
   function syncLineHint() {
-    if (!state.pdf) {
+    if (!state.doc || state.doc.kind !== 'pdf') {
       els.lineHint.textContent = 'Open a PDF to measure its line spacing.';
       return;
     }
@@ -1031,30 +1894,46 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     els.lineHint.textContent = `Measured from this PDF: ${measured} px per line at the current zoom. Adjust if the arrows move too far or not far enough.`;
   }
 
+  function buildFontGrid() {
+    for (const [key, f] of Object.entries(FONTS)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.font = key;
+      b.innerHTML = '<span class="sample"></span><span class="name"></span>';
+      const sample = b.querySelector('.sample');
+      sample.textContent = f.sample || 'Aa';
+      sample.style.fontFamily = f.stack;
+      b.querySelector('.name').textContent = f.label;
+      els.fontGrid.appendChild(b);
+    }
+  }
+
   function syncUI() {
     els.speed.value = sliderFromSpeed(settings.speed);
     els.speedOut.innerHTML = `<b>${settings.speed}</b> lines/min`;
-    document.querySelectorAll('[data-jump]').forEach((n) => { n.textContent = settings.jump; });
+    $$('[data-jump]').forEach((n) => { n.textContent = settings.jump; });
     $('#upMany').title = $('#upMany').ariaLabel = `Back ${settings.jump} lines`;
     $('#downMany').title = $('#downMany').ariaLabel = `Forward ${settings.jump} lines`;
     els.jumpOut.textContent = `${settings.jump} lines`;
-    els.zoomOut.textContent = `${Math.round(settings.zoom * 100)}%`;
+    $$('.only-pages [data-zoom-out]').forEach((o) => { o.textContent = `${Math.round(settings.zoom * 100)}%`; });
+    $$('.only-text [data-zoom-out]').forEach((o) => { o.textContent = `${Math.round(settings.textZoom * 100)}%`; });
     els.lineFactor.value = Math.round(settings.lineFactor * 100);
     els.lineOut.textContent = `${Math.round(settings.lineFactor * 100)}% of measured`;
     els.guideToggle.checked = settings.guide;
     document.body.classList.toggle('guide-on', settings.guide);
 
-    document.querySelectorAll('.seg').forEach((seg) => {
-      const cur = String(settings[seg.dataset.setting]);
+    const current = { ...settings, view: state.view };
+    $$('.seg').forEach((seg) => {
+      const cur = String(current[seg.dataset.setting]);
       seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === cur)));
     });
+    els.fontGrid.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.font === settings.font)));
     const presets = ['0', '5', '10', '20', '30'];
     els.stopCustom.value = presets.includes(String(settings.stopAfter)) ? '' : settings.stopAfter;
 
     const o = settings.orientation;
     const label = o.charAt(0).toUpperCase() + o.slice(1);
-    const use = els.orientBtn.querySelector('use');
-    use.setAttribute('href', o === 'auto' ? '#i-auto' : '#i-portrait');
+    els.orientBtn.querySelector('use').setAttribute('href', o === 'auto' ? '#i-auto' : '#i-portrait');
     els.orientBtn.querySelector('.i').style.transform = o === 'landscape' ? 'rotate(90deg)' : '';
     els.orientBtn.title = els.orientBtn.ariaLabel = `Orientation: ${label}`;
     els.orientHint.textContent = isNative
@@ -1069,10 +1948,20 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   }
 
   // ---------- Wiring ----------
-  const openPicker = () => els.fileInput.click();
-  $('#openBtn').addEventListener('click', openPicker);
-  $('#emptyOpen').addEventListener('click', openPicker);
   els.fileInput.addEventListener('change', () => openFile(els.fileInput.files[0]));
+  $('#emptyOpen').addEventListener('click', () => els.fileInput.click());
+  $('#libOpen').addEventListener('click', () => { els.library.close(); els.fileInput.click(); });
+  $('#libraryBtn').addEventListener('click', openLibrary);
+  $('#recentAll').addEventListener('click', openLibrary);
+  els.bookList.addEventListener('click', onBookListClick);
+  els.recentList.addEventListener('click', onBookListClick);
+  $('#libClear').addEventListener('click', async () => {
+    if (!confirm('Remove every file from your library? Reading positions will be forgotten.')) return;
+    await Promise.all([DB.clear('books'), DB.clear('files'), DB.clear('renders')]).catch(() => {});
+    if (state.doc) state.doc.meta.unsaved = true;
+    renderLibrary();
+    renderRecent();
+  });
 
   els.play.addEventListener('click', togglePlay);
   $('#upOne').addEventListener('click', () => stepLines(-1));
@@ -1096,10 +1985,13 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   document.addEventListener('webkitfullscreenchange', onFsChange);
 
   $('#settingsBtn').addEventListener('click', () => { syncUI(); els.settings.showModal(); });
-  $('#closeSettings').addEventListener('click', () => els.settings.close());
-  els.settings.addEventListener('click', (e) => { if (e.target === els.settings) els.settings.close(); });
+  for (const dlg of [els.settings, els.library]) {
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg || e.target.closest('[data-close]')) dlg.close();
+    });
+  }
 
-  document.querySelectorAll('.seg').forEach((seg) => {
+  $$('.seg').forEach((seg) => {
     seg.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-value]');
       if (!b) return;
@@ -1107,11 +1999,17 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
       const raw = b.dataset.value;
       const val = isNaN(+raw) ? raw : +raw;
       if (key === 'orientation') { setOrientation(val); return; }
+      if (key === 'view') { setView(val); return; }
       settings[key] = val;
       if (key === 'stopAfter') state.timerLeft = state.playing && val > 0 ? val * 60 : 0;
       saveSettings();
+      if (key === 'lineHeight') layout(true);
       syncUI();
     });
+  });
+  els.fontGrid.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-font]');
+    if (b) setFont(b.dataset.font);
   });
   els.stopCustom.addEventListener('change', () => {
     const m = Math.round(+els.stopCustom.value);
@@ -1121,33 +2019,86 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     saveSettings();
     syncUI();
   });
-  document.querySelectorAll('[data-adjust]').forEach((b) => {
+  $$('[data-adjust]').forEach((b) => {
     b.addEventListener('click', () => {
       const by = +b.dataset.by;
       if (b.dataset.adjust === 'jump') {
         settings.jump = clamp(settings.jump + by, 2, 30);
         saveSettings();
         syncUI();
+      } else if (b.closest('.only-text') && state.view !== 'text') {
+        setZoomFor('textZoom', settings.textZoom + by);
+      } else if (b.closest('.only-pages') && state.view !== 'pages') {
+        setZoomFor('zoom', settings.zoom + by);
       } else {
-        setZoom(settings.zoom + by);
+        setZoom(settings[zoomKey()] + by);
       }
     });
   });
-  $('#fitWidth').addEventListener('click', () => setZoom(1));
-  els.lineFactor.addEventListener('input', () => setLineFactor(+els.lineFactor.value / 100));
+  $$('[data-zoom-reset]').forEach((b) => {
+    b.addEventListener('click', () => {
+      if (b.closest('.only-text') && state.view !== 'text') setZoomFor('textZoom', 1);
+      else if (b.closest('.only-pages') && state.view !== 'pages') setZoomFor('zoom', 1);
+      else setZoom(1);
+    });
+  });
+  // Adjust the zoom of a view that isn't showing (e.g. before a file is open)
+  function setZoomFor(key, z) {
+    const [lo, hi] = key === 'textZoom' ? ZOOM_LIMITS.text : ZOOM_LIMITS.pages;
+    settings[key] = clamp(Math.round(z * 10) / 10, lo, hi);
+    saveSettings();
+    syncUI();
+  }
   $('#lineReset').addEventListener('click', () => setLineFactor(1));
+  els.lineFactor.addEventListener('input', () => setLineFactor(+els.lineFactor.value / 100));
   els.guideToggle.addEventListener('change', () => setGuide(els.guideToggle.checked));
 
-  // Reader interaction: touch/drag takes over, tap toggles controls
+  // Reader interaction: touch/drag takes over, two fingers zoom, tap toggles controls
   const v = els.viewer;
   const endHold = () => {
     state.holding = false;
     state.holdUntil = performance.now() + 150;
     state.pos = state.expected = v.scrollTop;
   };
-  v.addEventListener('touchstart', () => { state.holding = true; state.anim = null; }, { passive: true });
-  v.addEventListener('touchend', endHold, { passive: true });
-  v.addEventListener('touchcancel', endHold, { passive: true });
+  const touchMid = (t) => {
+    const r = v.getBoundingClientRect();
+    return [(t[0].clientX + t[1].clientX) / 2 - r.left, (t[0].clientY + t[1].clientY) / 2 - r.top];
+  };
+  const touchDist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
+  v.addEventListener('touchstart', (e) => {
+    state.holding = true;
+    state.anim = null;
+    if (e.touches.length === 2 && state.doc && !gesture.active) {
+      gesture.d0 = touchDist(e.touches);
+      const [mx, my] = touchMid(e.touches);
+      gestureStart(mx, my);
+    }
+  }, { passive: true });
+  v.addEventListener('touchmove', (e) => {
+    if (!gesture.active || e.touches.length < 2) return;
+    if (e.cancelable) e.preventDefault();
+    const [mx, my] = touchMid(e.touches);
+    gestureUpdate(touchDist(e.touches) / gesture.d0, mx, my);
+  }, { passive: false });
+  const onTouchEnd = (e) => {
+    if (gesture.active && e.touches.length < 2) gestureEnd();
+    if (e.touches.length === 0) endHold();
+  };
+  v.addEventListener('touchend', onTouchEnd, { passive: true });
+  v.addEventListener('touchcancel', onTouchEnd, { passive: true });
+  // Trackpad pinch and Ctrl + mouse wheel
+  v.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey || !state.doc) return;
+    e.preventDefault();
+    const r = v.getBoundingClientRect();
+    if (!gesture.active) gestureStart(e.clientX - r.left, e.clientY - r.top);
+    gesture.wheel = clamp(gesture.wheel * Math.exp(-e.deltaY * 0.01), 0.1, 10);
+    gestureUpdate(gesture.wheel, gesture.mx0, gesture.my0);
+    gesture.wheel = gesture.s;
+    clearTimeout(gesture.timer);
+    gesture.timer = setTimeout(gestureEnd, 200);
+  }, { passive: false });
+
   v.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') { state.holding = true; state.anim = null; } });
   window.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse' && state.holding) endHold(); });
   v.addEventListener('scroll', () => {
@@ -1158,10 +2109,11 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
       state.holdUntil = performance.now() + 150;
     }
     updateReadouts(false);
-    savePositionSoon();
+    saveProgressSoon();
   }, { passive: true });
-  v.addEventListener('click', () => {
-    if (!state.pdf) return;
+  v.addEventListener('click', (e) => {
+    if (e.target.closest('a')) e.preventDefault();
+    if (!state.doc) return;
     const sel = window.getSelection && window.getSelection();
     if (sel && String(sel)) return;
     document.body.classList.toggle('immersive');
@@ -1170,7 +2122,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   document.addEventListener('keydown', (e) => {
     const t = e.target;
     if (t.matches && t.matches('input[type="number"], input[type="text"], textarea')) return;
-    if (els.settings.open || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (els.settings.open || els.library.open || e.ctrlKey || e.metaKey || e.altKey) return;
     let handled = true;
     switch (e.key) {
       case ' ': case 'k': case 'K': togglePlay(); break;
@@ -1181,7 +2133,8 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
       case 'f': case 'F': toggleFullscreen(); break;
       case 'o': case 'O': cycleOrientation(); break;
       case 'g': case 'G': setGuide(!settings.guide); break;
-      case 'h': case 'H': if (state.pdf) document.body.classList.toggle('immersive'); break;
+      case 'l': case 'L': openLibrary(); break;
+      case 'h': case 'H': if (state.doc) document.body.classList.toggle('immersive'); break;
       default: handled = false;
     }
     if (handled) e.preventDefault();
@@ -1203,7 +2156,7 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
     if (f) openFile(f);
   });
 
-  // Size changes (rotation, window resize, controls wrapping)
+  // Size changes (rotation, window resize, controls wrapping, fonts arriving)
   const measureChrome = () => {
     const root = document.documentElement.style;
     root.setProperty('--hh', els.top.offsetHeight + 'px');
@@ -1220,29 +2173,34 @@ kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; bord
   new ResizeObserver(() => { measureChrome(); sizeFrame(); scheduleLayout(); }).observe(els.top);
   new ResizeObserver(() => { measureChrome(); sizeFrame(); scheduleLayout(); }).observe(els.dock);
   window.addEventListener('resize', sizeFrame);
+  if (document.fonts) document.fonts.addEventListener('loadingdone', () => { if (state.view === 'text') scheduleLayout(); });
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.playing) requestWake();
-    if (document.visibilityState === 'hidden') { pause(); savePosition(); }
+    if (document.visibilityState === 'hidden') { pause(); saveProgress(); }
   });
-  window.addEventListener('pagehide', savePosition);
+  window.addEventListener('pagehide', () => saveProgress());
 
   if (AppPlugin) {
     AppPlugin.addListener('backButton', () => {
       if (els.settings.open) els.settings.close();
+      else if (els.library.open) els.library.close();
       else if (document.body.classList.contains('immersive')) document.body.classList.remove('immersive');
       else if (state.playing || state.countdown) pause();
+      else if (state.doc) { saveProgress(); closeDoc(); renderRecent(); syncUI(); }
       else callNative(() => AppPlugin.exitApp());
     });
   }
 
   // ---------- Start ----------
+  buildFontGrid();
   measureChrome();
   if (isNative && settings.orientation !== 'auto') setOrientation(settings.orientation, { quiet: true });
   if (!coarse && settings.orientation !== 'auto') document.body.dataset.preview = settings.orientation;
   sizeFrame();
   syncUI();
-  if (!pdfjsLib) toast('The PDF engine did not load. Check your internet connection and reload.', 6000);
+  renderRecent();
+  if (!pdfjsLib) toast('The PDF engine didn’t load. Check your connection and reload.', 6000);
 })();
 </script>
 </body>

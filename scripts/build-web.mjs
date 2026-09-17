@@ -9,17 +9,26 @@ fs.mkdirSync(path.join(out, 'fonts'), { recursive: true });
 
 fs.copyFileSync('src/index.html', path.join(out, 'index.html'));
 
-const pdfjs = 'node_modules/pdfjs-dist/build';
-for (const f of ['pdf.min.js', 'pdf.worker.min.js']) {
-  fs.copyFileSync(path.join(pdfjs, f), path.join(out, 'lib', f));
-}
+const libs = {
+  'node_modules/pdfjs-dist/build/pdf.min.js': 'pdf.min.js',
+  'node_modules/pdfjs-dist/build/pdf.worker.min.js': 'pdf.worker.min.js',
+  'node_modules/mammoth/mammoth.browser.min.js': 'mammoth.browser.min.js',
+};
+for (const [from, to] of Object.entries(libs)) fs.copyFileSync(from, path.join(out, 'lib', to));
 
-const fonts = 'node_modules/@fontsource/atkinson-hyperlegible/files';
-for (const w of [400, 700]) {
-  fs.copyFileSync(
-    path.join(fonts, `atkinson-hyperlegible-latin-${w}-normal.woff2`),
-    path.join(out, 'fonts', `atkinson-${w}.woff2`),
-  );
-}
+const fontsource = (pkg, file) => path.join('node_modules/@fontsource', pkg, 'files', file);
+const fonts = {
+  'atkinson-400.woff2': fontsource('atkinson-hyperlegible', 'atkinson-hyperlegible-latin-400-normal.woff2'),
+  'atkinson-700.woff2': fontsource('atkinson-hyperlegible', 'atkinson-hyperlegible-latin-700-normal.woff2'),
+  'literata-400.woff2': fontsource('literata', 'literata-latin-400-normal.woff2'),
+  'literata-700.woff2': fontsource('literata', 'literata-latin-700-normal.woff2'),
+  'opendyslexic-400.woff2': fontsource('opendyslexic', 'opendyslexic-latin-400-normal.woff2'),
+  'opendyslexic-700.woff2': fontsource('opendyslexic', 'opendyslexic-latin-700-normal.woff2'),
+  'mukta-deva-400.woff2': fontsource('mukta', 'mukta-devanagari-400-normal.woff2'),
+  'mukta-deva-700.woff2': fontsource('mukta', 'mukta-devanagari-700-normal.woff2'),
+  'mukta-latin-400.woff2': fontsource('mukta', 'mukta-latin-400-normal.woff2'),
+  'mukta-latin-700.woff2': fontsource('mukta', 'mukta-latin-700-normal.woff2'),
+};
+for (const [to, from] of Object.entries(fonts)) fs.copyFileSync(from, path.join(out, 'fonts', to));
 
 console.log('Built www/');
