@@ -13,6 +13,7 @@ const libs = {
   'node_modules/pdfjs-dist/build/pdf.min.js': 'pdf.min.js',
   'node_modules/pdfjs-dist/build/pdf.worker.min.js': 'pdf.worker.min.js',
   'node_modules/mammoth/mammoth.browser.min.js': 'mammoth.browser.min.js',
+  'node_modules/jszip/dist/jszip.min.js': 'jszip.min.js',
 };
 for (const [from, to] of Object.entries(libs)) fs.copyFileSync(from, path.join(out, 'lib', to));
 
