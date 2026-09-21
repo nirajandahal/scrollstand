@@ -85,6 +85,57 @@
     --docx: #7EA6E6;
 }
 :root[data-theme="light"] { color-scheme: light; }
+
+/* Deep saffron accent (a choice in Settings → Theme → Colour) */
+:root[data-accent="saffron"] {
+  --amber: #FF9933;
+  --amber-ink: #2A1500;
+  --band: rgba(255, 153, 51, .18);
+  --band-edge: rgba(214, 110, 0, .55);
+  --accent-text: #B4540A;
+}
+:root[data-accent="saffron"][data-theme="night"] {
+  --amber: #FF9F43;
+  --amber-ink: #1A202D;
+  --band: rgba(255, 159, 67, .15);
+  --band-edge: rgba(255, 159, 67, .6);
+  --accent-text: #FFB266;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="saffron"][data-theme="system"] {
+  --amber: #FF9F43;
+  --amber-ink: #1A202D;
+  --band: rgba(255, 159, 67, .15);
+  --band-edge: rgba(255, 159, 67, .6);
+  --accent-text: #FFB266;
+  }
+}
+
+/* High dark contrast: true black background, bright white text */
+:root[data-theme="night"][data-contrast="high"] {
+  --desk: #050608;
+  --chrome: rgba(10, 12, 16, .94);
+  --chrome-solid: #0A0C10;
+  --raise: #1A1E26;
+  --ink: #F4F6FA;
+  --muted: #A8B1C2;
+  --rule: #2A303B;
+  --paper: #000000;
+  --paper-ink: #FFFFFF;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"][data-contrast="high"] {
+  --desk: #050608;
+  --chrome: rgba(10, 12, 16, .94);
+  --chrome-solid: #0A0C10;
+  --raise: #1A1E26;
+  --ink: #F4F6FA;
+  --muted: #A8B1C2;
+  --rule: #2A303B;
+  --paper: #000000;
+  --paper-ink: #FFFFFF;
+  }
+}
 :root[data-theme="sepia"] {
   color-scheme: light;
   --desk: #E6DAC0;
@@ -132,7 +183,7 @@ button, input { font: inherit; color: inherit; }
   height: 48px; padding: 0 22px; border-radius: 24px; font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
 }
-.link { appearance: none; border: 0; background: none; cursor: pointer; color: var(--amber); font-weight: 700; padding: 8px; }
+.link { appearance: none; border: 0; background: none; cursor: pointer; color: var(--accent-text, var(--amber)); font-weight: 700; padding: 8px; }
 
 /* ---------- Stage & reader ---------- */
 #stage { position: fixed; inset: 0; display: grid; }
@@ -154,7 +205,14 @@ body[data-preview] #frame { border: 6px solid var(--chrome-solid); border-radius
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"][data-pdf-invert="on"] .page { background: #1E1F24; }
   :root[data-theme="system"][data-pdf-invert="on"] .page canvas { filter: invert(.88) hue-rotate(180deg); }
+  :root[data-theme="system"][data-pdf-invert="on"][data-contrast="high"] .page { background: #000; }
+  :root[data-theme="system"][data-pdf-invert="on"][data-contrast="high"] .page canvas { filter: invert(1) hue-rotate(180deg); }
 }
+:root[data-theme="night"][data-pdf-invert="on"][data-contrast="high"] .page { background: #000; }
+:root[data-theme="night"][data-pdf-invert="on"][data-contrast="high"] .page canvas { filter: invert(1) hue-rotate(180deg); }
+/* Read aloud: the sentence being spoken */
+::highlight(read-now) { background-color: var(--band); text-decoration: underline 2px var(--amber); text-underline-offset: 4px; }
+.hl.read i { background: var(--band); box-shadow: inset 0 -2px 0 var(--amber); border-radius: 2px; }
 /* Search highlights on PDF pages */
 .hl { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 .hl i { position: absolute; border-radius: 2px; background: rgba(242, 181, 68, .42); }
@@ -265,7 +323,7 @@ body.counting .play { animation: pulse 1s ease-in-out infinite; }
 .readout { display: flex; flex-direction: column; align-items: flex-end; min-width: 108px; padding-left: 6px; }
 #speedOut { font-variant-numeric: tabular-nums; white-space: nowrap; }
 #speedOut b { font-size: 20px; }
-#status { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 16px; }
+#status { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 16px; max-width: 44vw; overflow: hidden; text-overflow: ellipsis; }
 
 body.immersive #top { transform: translateY(-110%); }
 body.immersive #dock { transform: translateY(110%); }
@@ -304,7 +362,7 @@ body.loading #loading { display: grid; }
 body.counting #countdown { display: grid; }
 #countdown span {
   width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center;
-  font-size: 84px; font-weight: 700; color: var(--amber); background: var(--chrome);
+  font-size: 84px; font-weight: 700; color: var(--accent-text, var(--amber)); background: var(--chrome);
   box-shadow: 0 8px 30px rgba(15, 20, 30, .25); font-variant-numeric: tabular-nums;
 }
 
@@ -375,6 +433,15 @@ dialog.sheet-dialog::backdrop { background: rgba(12, 16, 24, .45); }
 .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
 .switch:checked { background: var(--amber); }
 .switch:checked::after { transform: translateX(20px); }
+.subhead { margin: 16px 0 8px; font-size: 14px; }
+.seg .sw { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15); }
+.voice-select {
+  width: 100%; height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--rule);
+  background: var(--raise); color: var(--ink); font: inherit;
+}
+.voice-actions { display: flex; justify-content: space-between; margin-top: 6px; }
+.voice-actions .link { padding-left: 0; padding-right: 0; }
+body:not(.mode-speak) .only-speak { display: none; }
 .check-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 14px; }
 .font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
 .font-grid button {
@@ -546,10 +613,27 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
 
     <section class="set">
       <h3>Scrolling</h3>
-      <p class="hint">Page flip turns a whole page at a set interval, handy for sheet music and slides. The speed control then sets seconds per page.</p>
+      <p class="hint">Page flip turns a whole page at a set interval, handy for sheet music. Read aloud reads the text with your phone's voice and scrolls along with it.</p>
       <div class="seg" data-setting="motion">
-        <button type="button" data-value="scroll">Smooth scroll</button>
+        <button type="button" data-value="scroll">Smooth</button>
         <button type="button" data-value="flip">Page flip</button>
+        <button type="button" data-value="speak">Read aloud</button>
+      </div>
+    </section>
+
+    <section class="set only-speak">
+      <h3>Voice</h3>
+      <p class="hint" id="voiceHint">Voices come from your phone.</p>
+      <select id="voiceSelect" class="voice-select" aria-label="Voice"><option value="">Automatic</option></select>
+      <div class="voice-actions">
+        <button class="link" type="button" id="voiceTest">Hear this voice</button>
+        <button class="link" type="button" id="voiceMore" hidden>Get more voices</button>
+      </div>
+      <h4 class="subhead">Pitch</h4>
+      <div class="seg" data-setting="voicePitch">
+        <button type="button" data-value="0.85">Lower</button>
+        <button type="button" data-value="1">Normal</button>
+        <button type="button" data-value="1.15">Higher</button>
       </div>
     </section>
 
@@ -560,6 +644,17 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
         <button type="button" data-value="light">Light</button>
         <button type="button" data-value="sepia">Sepia</button>
         <button type="button" data-value="night">Night</button>
+      </div>
+      <h4 class="subhead">Colour</h4>
+      <div class="seg" data-setting="accent">
+        <button type="button" data-value="amber"><span class="sw" style="background:#D9901F"></span>Amber</button>
+        <button type="button" data-value="saffron"><span class="sw" style="background:#FF9933"></span>Saffron</button>
+      </div>
+      <h4 class="subhead">Dark contrast</h4>
+      <p class="hint">For the Night theme, and System when your phone is in dark mode. High uses a black background with bright white text.</p>
+      <div class="seg" data-setting="contrast">
+        <button type="button" data-value="soft">Soft</button>
+        <button type="button" data-value="high">High</button>
       </div>
       <label class="check-row"><span>Darken PDF pages in the dark theme</span><input type="checkbox" class="switch" id="pdfInvert"></label>
     </section>
@@ -672,7 +767,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       <h3>Keyboard</h3>
       <dl class="keys">
         <dt><kbd>Space</kbd></dt><dd>Play or pause</dd>
-        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>One line (one page in page-flip mode)</dd>
+        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>One line (a page in page flip, a sentence in read aloud)</dd>
         <dt><kbd>Shift</kbd> + <kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Several lines</dd>
         <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Faster or slower</dd>
         <dt><kbd>Ctrl</kbd> + scroll</dt><dd>Zoom</dd>
@@ -707,7 +802,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     fontGrid: $('#fontGrid'), bookList: $('#bookList'), libEmpty: $('#libEmpty'), libFoot: $('#libFoot'),
     libUsage: $('#libUsage'), recent: $('#recent'), recentList: $('#recentList'), libCloseDoc: $('#libCloseDoc'),
     searchBtn: $('#searchBtn'), searchBar: $('#searchBar'), searchInput: $('#searchInput'), searchCount: $('#searchCount'),
-    pdfInvert: $('#pdfInvert'), mirrorToggle: $('#mirrorToggle'), themeMeta: document.querySelector('meta[name="theme-color"]'),
+    pdfInvert: $('#pdfInvert'), mirrorToggle: $('#mirrorToggle'),
+    voiceSelect: $('#voiceSelect'), voiceHint: $('#voiceHint'), voiceMore: $('#voiceMore'), themeMeta: document.querySelector('meta[name="theme-color"]'),
   };
 
   const GAP = 12;                       // px between PDF pages
@@ -746,6 +842,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     speed: 40, jump: 3, delay: 0, stopAfter: 0, orientation: 'auto', guide: true,
     zoom: 1, lineFactor: 1, textZoom: 1, font: 'atkinson', lineHeight: 1.6,
     theme: 'system', pdfInvert: true, mirror: false, motion: 'scroll', flipSeconds: 20,
+    accent: 'amber', contrast: 'soft', voice: '', voiceRate: 1, voicePitch: 1,
   };
   const settings = Object.assign({}, DEFAULTS, store.get('scrollstand:settings', {}));
   if (!FONTS[settings.font]) settings.font = DEFAULTS.font;
@@ -850,6 +947,11 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   const secsFromSlider = (x) => Math.round(MIN_FLIP * Math.pow(MAX_FLIP / MIN_FLIP, x / 100));
   const sliderFromSecs = (s) => Math.round(100 * Math.log(s / MIN_FLIP) / Math.log(MAX_FLIP / MIN_FLIP));
   const isFlip = () => settings.motion === 'flip';
+  const isSpeak = () => settings.motion === 'speak';
+  const MIN_RATE = 0.5, MAX_RATE = 2;
+  const rateFromSlider = (x) => Math.round((MIN_RATE + (MAX_RATE - MIN_RATE) * x / 100) * 20) / 20;
+  const sliderFromRate = (r) => Math.round(((r - MIN_RATE) / (MAX_RATE - MIN_RATE)) * 100);
+  const fmtRate = (r) => `${r.toFixed(r * 10 % 1 ? 2 : 1)}×`;
   const guideOn = () => settings.guide && !isFlip();
 
   let toastTimer;
@@ -1040,6 +1142,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     saveTimer = null;
     saveProgress();
     closeSearch();
+    resetReader();
     observer.disconnect();
     state.pages.forEach(releasePage);
     els.pages.replaceChildren();
@@ -1473,6 +1576,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   async function showView(view, target) {
+    resetReader();
     state.view = view;
     document.body.classList.toggle('view-text', view === 'text');
     document.body.classList.toggle('view-pages', view === 'pages');
@@ -1753,7 +1857,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
         if (isFlip()) {
           state.flipLeft -= dt;
           if (state.flipLeft <= 0) flip(1, true);
-        } else {
+        } else if (!isSpeak()) {
           state.pos += pxPerSec() * dt;
         }
         tickTimer(dt);
@@ -1762,7 +1866,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       state.pos = clamp(state.pos, 0, Math.max(0, max));
       state.expected = state.pos;
       v.scrollTop = state.pos;
-      if (state.playing && !isFlip() && atEnd(state.pos)) {
+      if (state.playing && settings.motion === 'scroll' && atEnd(state.pos)) {
         pause();
         toast('Reached the end.');
       }
@@ -1839,7 +1943,15 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     }
     ensureLoop();
   }
-  const stepOne = (dir) => (isFlip() ? flip(dir) : stepLines(dir));
+  const stepOne = (dir) => {
+    if (isSpeak()) readerJump(dir > 0 ? async () => { reader.idx++; } : readerBack);
+    else if (isFlip()) flip(dir);
+    else stepLines(dir);
+  };
+  const jumpMany = (dir) => {
+    if (isSpeak()) readerJump(() => readerSkipUnit(dir));
+    else stepLines(dir * settings.jump);
+  };
 
   function togglePlay() {
     if (state.countdown) { cancelCountdown(); return; }
@@ -1863,12 +1975,14 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     els.play.title = els.play.ariaLabel = 'Pause';
     requestWake();
     ensureLoop();
+    if (isSpeak()) startReading();
   }
 
   function pause() {
     cancelCountdown();
     if (!state.playing) return;
     state.playing = false;
+    if (isSpeak()) stopReading();
     document.body.classList.remove('playing');
     els.play.title = els.play.ariaLabel = 'Play';
     releaseWake();
@@ -2003,6 +2117,9 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     if (!state.doc) return settings.stopAfter > 0 ? `Stops after ${settings.stopAfter} min` : '';
     const parts = [];
     const rem = Math.max(0, docEnd() - (v.scrollTop + readPoint()));
+    if (isSpeak()) {
+      return `${state.playing ? 'Reading aloud' : 'Read aloud'} · ${voiceLabel()}`;
+    }
     if (isFlip()) {
       const screen = Math.max(80, v.clientHeight - state.ins.top - state.ins.bottom - GAP);
       parts.push(state.playing
@@ -2178,7 +2295,13 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     saveSettings();
     syncUI();
   }
+  function setRate(r) {
+    settings.voiceRate = clamp(Math.round(r * 20) / 20, MIN_RATE, MAX_RATE);
+    saveSettings();
+    syncUI();
+  }
   function nudgeSpeed(dir) {
+    if (isSpeak()) { setRate(settings.voiceRate + dir * 0.1); return; }
     if (isFlip()) {
       const s = settings.flipSeconds;
       setFlipSeconds(s + dir * (s < 10 ? 1 : s < 60 ? 5 : 15));
@@ -2189,13 +2312,367 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     setSpeed(s + dir * step);
   }
   function setMotion(mode) {
+    if (mode === settings.motion) return;
+    pause();
+    resetReader();
     settings.motion = mode;
     state.anim = null;
+    if (mode === 'speak') loadVoices().then(renderVoices);
     state.flipLeft = settings.flipSeconds;
     saveSettings();
     layout(true);
     syncUI();
   }
+
+  // ---------- Read aloud: the phone's own voices ----------
+  const TTS = isNative ? Cap.Plugins.TextToSpeech : null;
+  const webSpeech = !isNative && 'speechSynthesis' in window ? window.speechSynthesis : null;
+  const DEVANAGARI_RE = /[\u0900-\u097F]/;
+  let voiceList = [];
+  let voicesPromise = null;
+  const langNames = (() => { try { return new Intl.DisplayNames(['en'], { type: 'language' }); } catch { return null; } })();
+  const langName = (tag) => { try { return (langNames && langNames.of(tag)) || tag; } catch { return tag; } };
+
+  function loadVoices() {
+    if (voicesPromise) return voicesPromise;
+    voicesPromise = (async () => {
+      if (TTS) {
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const { voices } = await TTS.getSupportedVoices();
+          if (voices && voices.length) {
+            voiceList = voices.map((v, idx) => ({ id: v.voiceURI || v.name, name: v.name, lang: (v.lang || '').replace('_', '-'), online: v.localService === false, idx }));
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 600)); // the speech engine may still be starting
+        }
+      } else if (webSpeech) {
+        let vs = webSpeech.getVoices();
+        if (!vs.length) {
+          vs = await new Promise((resolve) => {
+            const t = setTimeout(() => resolve(webSpeech.getVoices()), 1500);
+            webSpeech.addEventListener('voiceschanged', () => { clearTimeout(t); resolve(webSpeech.getVoices()); }, { once: true });
+          });
+        }
+        voiceList = vs.map((v, idx) => ({ id: v.voiceURI || v.name, name: v.name, lang: v.lang, online: !v.localService, idx, web: v }));
+      }
+      if (!voiceList.length) voicesPromise = null; // try again next time
+      return voiceList;
+    })().catch((err) => { console.warn(err); voicesPromise = null; return []; });
+    return voicesPromise;
+  }
+
+  const chosenVoice = () => voiceList.find((v) => v.id === settings.voice) || null;
+  const autoLang = () => {
+    const l = navigator.language || 'en-US';
+    return /^(ne|hi|mr)/i.test(l) ? 'en-US' : l;
+  };
+  function voiceLabel(v = chosenVoice()) {
+    if (!v) return 'phone voice';
+    if (!TTS) return v.name;
+    const same = voiceList.filter((x) => x.lang === v.lang);
+    return `${langName(v.lang)} ${same.indexOf(v) + 1}`;
+  }
+  // Devanagari sentences go to a Nepali voice (or Hindi as a stand-in) when the chosen one can't read them
+  function pickVoice(text) {
+    const chosen = chosenVoice();
+    if (DEVANAGARI_RE.test(text) && !(chosen && /^(ne|hi|mr)/i.test(chosen.lang))) {
+      const find = (re, online) => voiceList.find((v) => re.test(v.lang) && v.online === online);
+      return find(/^ne/i, false) || find(/^ne/i, true) || find(/^hi/i, false) || find(/^hi/i, true) || { lang: 'ne-NP' };
+    }
+    return chosen;
+  }
+
+  let currentUtterance = null;
+  function speakText(text, voice) {
+    const rate = settings.voiceRate, pitch = settings.voicePitch;
+    const lang = (voice && voice.lang) || autoLang();
+    if (TTS) {
+      const opts = { text, lang, rate, pitch, volume: 1 };
+      if (voice && voice.idx != null) opts.voice = voice.idx;
+      return TTS.speak(opts).then(() => 'done', (err) => { console.warn(err); return 'error'; });
+    }
+    if (webSpeech) {
+      return new Promise((resolve) => {
+        const u = new SpeechSynthesisUtterance(text);
+        if (voice && voice.web) u.voice = voice.web;
+        u.lang = lang;
+        u.rate = rate;
+        u.pitch = pitch;
+        u.onend = () => resolve('done');
+        u.onerror = (e) => resolve(e.error === 'interrupted' || e.error === 'canceled' ? 'stopped' : 'error');
+        currentUtterance = u; // keep a reference so the browser doesn't drop it mid-sentence
+        webSpeech.speak(u);
+      });
+    }
+    return Promise.resolve('error');
+  }
+  function stopSpeech() {
+    if (TTS) callNative(() => TTS.stop());
+    else if (webSpeech) webSpeech.cancel();
+    currentUtterance = null;
+  }
+
+  // Split text into sentences, keeping each piece short enough for every voice engine
+  const sentenceSegmenter = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'sentence' }) : null;
+  function sentenceSpans(text) {
+    const spans = [];
+    const add = (s, e) => {
+      while (s < e && /\s/.test(text[s])) s++;
+      while (e > s && /\s/.test(text[e - 1])) e--;
+      if (e <= s || !/[\p{L}\p{N}]/u.test(text.slice(s, e))) return;
+      while (e - s > 260) {
+        const part = text.slice(s, s + 260);
+        const pause = Math.max(part.lastIndexOf(', '), part.lastIndexOf('; '), part.lastIndexOf(': '));
+        const space = part.lastIndexOf(' ');
+        const at = s + (pause > 80 ? pause + 1 : space > 80 ? space : 260);
+        spans.push([s, at]);
+        s = at;
+        while (s < e && /\s/.test(text[s])) s++;
+      }
+      if (e > s) spans.push([s, e]);
+    };
+    if (sentenceSegmenter) {
+      for (const seg of sentenceSegmenter.segment(text)) add(seg.index, seg.index + seg.segment.length);
+    } else {
+      const re = /[^.!?।]+(?:[.!?।]+["'’”)\]]*|$)/g;
+      for (let m = re.exec(text); m; m = re.exec(text)) add(m.index, m.index + m[0].length);
+    }
+    return spans;
+  }
+  const cleanForSpeech = (t) => t.replace(/([A-Za-z])-\s+([a-z])/g, '$1$2').replace(/\s+/g, ' ').trim();
+
+  function blockSentences(b) {
+    const el = state.blocks[b];
+    if (!el || el.classList.contains('pgmark') || el.tagName === 'HR') return [];
+    // Walk the text, adding a space between table cells, list items and line breaks
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    const nodes = [], starts = [];
+    let text = '';
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (n.nodeType === 1) {
+        if (/^(BR|TD|TH|TR|LI|P|DIV|H[1-6]|BLOCKQUOTE|DT|DD)$/.test(n.tagName) && text && !/\s$/.test(text)) text += ' ';
+        continue;
+      }
+      nodes.push(n);
+      starts.push(text.length);
+      text += n.data;
+    }
+    if (!nodes.length) return [];
+    return sentenceSpans(text).map(([s, e]) => {
+      const a = lastLE(starts, s), z = lastLE(starts, e - 1);
+      const range = document.createRange();
+      range.setStart(nodes[a], Math.min(s - starts[a], nodes[a].data.length));
+      range.setEnd(nodes[z], Math.min(e - starts[z], nodes[z].data.length));
+      return { text: text.slice(s, e), range, unit: b };
+    });
+  }
+  async function pageSentences(n) {
+    const pt = await pdfPageText(state.doc, n);
+    return sentenceSpans(pt.text)
+      .map(([s, e]) => ({ text: pt.text.slice(s, e), rects: rectsFor(pt, s, e), page: n, unit: n }))
+      .filter((x) => x.rects.length);
+  }
+  const unitCount = () => (state.view === 'text' ? state.blocks.length : state.pages.length);
+  const unitSentences = (u) => (state.view === 'text' ? Promise.resolve(blockSentences(u)) : pageSentences(u));
+  function sentenceTop(s) {
+    if (s.range) {
+      const r = s.range.getBoundingClientRect();
+      return r.top - els.viewer.getBoundingClientRect().top + els.viewer.scrollTop;
+    }
+    return state.tops[s.page] + s.rects[0].t * state.pages[s.page].cssH;
+  }
+
+  const reader = { token: 0, unit: -1, queue: [], idx: 0, lastTop: null, marks: null, spoken: 0 };
+  function clearReadMark() {
+    if (reader.marks) { reader.marks.remove(); reader.marks = null; }
+    if (window.CSS && CSS.highlights) CSS.highlights.delete('read-now');
+  }
+  function resetReader() {
+    stopReading();
+    reader.unit = -1;
+    reader.queue = [];
+    reader.idx = 0;
+    reader.lastTop = null;
+    clearReadMark();
+  }
+  function stopReading() {
+    reader.token++;
+    stopSpeech();
+  }
+  // Start at the first sentence at or after a point in the document
+  async function readerSeek(y) {
+    const u = state.view === 'text'
+      ? (state.btops.length ? lastLE(state.btops, y) : 0)
+      : (state.tops.length ? lastLE(state.tops, y) : 0);
+    reader.unit = u;
+    reader.queue = await unitSentences(u);
+    const slack = linePx() * 0.6;
+    reader.idx = reader.queue.findIndex((s) => sentenceTop(s) >= y - slack);
+    if (reader.idx < 0) reader.idx = reader.queue.length;
+  }
+  async function readerCurrent() {
+    while (reader.idx >= reader.queue.length) {
+      if (reader.unit + 1 >= unitCount()) return null;
+      reader.unit++;
+      reader.queue = await unitSentences(reader.unit);
+      reader.idx = 0;
+    }
+    return reader.queue[reader.idx];
+  }
+  async function readerBack() {
+    if (reader.idx > 0) { reader.idx--; return; }
+    for (let u = reader.unit - 1; u >= 0; u--) {
+      const q = await unitSentences(u);
+      if (q.length) { reader.unit = u; reader.queue = q; reader.idx = q.length - 1; return; }
+    }
+  }
+  async function readerSkipUnit(dir) {
+    if (dir > 0) { reader.idx = reader.queue.length; return; }
+    if (reader.idx > 0) { reader.idx = 0; return; }
+    for (let u = reader.unit - 1; u >= 0; u--) {
+      const q = await unitSentences(u);
+      if (q.length) { reader.unit = u; reader.queue = q; reader.idx = 0; return; }
+    }
+  }
+  const readerMoved = () => reader.lastTop == null || Math.abs(els.viewer.scrollTop - reader.lastTop) > 4;
+  const readingPoint = () => els.viewer.scrollTop + state.padTop - linePx() * 0.4;
+
+  // Highlight the sentence and keep it on the reading guide
+  function showSentence(s) {
+    clearReadMark();
+    if (s.range) {
+      if (window.CSS && CSS.highlights) CSS.highlights.set('read-now', new Highlight(s.range));
+    } else {
+      const layer = document.createElement('div');
+      layer.className = 'hl read';
+      for (const r of s.rects) {
+        const mark = document.createElement('i');
+        mark.style.cssText = `left:${r.l * 100}%;top:${r.t * 100}%;width:${r.w * 100}%;height:${r.h * 100}%`;
+        layer.appendChild(mark);
+      }
+      state.pages[s.page].el.appendChild(layer);
+      reader.marks = layer;
+    }
+    const v = els.viewer;
+    const max = Math.max(0, v.scrollHeight - v.clientHeight);
+    const target = clamp(sentenceTop(s) - (state.guideTop - linePx() * 0.35), 0, max);
+    reader.lastTop = target;
+    if (Math.abs(target - v.scrollTop) > 2) {
+      if (!state.raf) state.pos = v.scrollTop;
+      state.holdUntil = 0;
+      if (reduceMotion) {
+        state.anim = null;
+        state.pos = target;
+      } else {
+        state.anim = { start: performance.now(), dur: 450, dist: target - state.pos, done: 0 };
+      }
+      ensureLoop();
+    }
+  }
+
+  async function readLoop(token) {
+    while (state.playing && token === reader.token) {
+      let s = null;
+      try { s = await readerCurrent(); } catch (err) { console.warn(err); }
+      if (token !== reader.token) return;
+      if (!s) {
+        pause();
+        toast(reader.spoken ? 'Finished reading.' : 'There’s no text here to read aloud.', 3500);
+        return;
+      }
+      showSentence(s);
+      const result = await speakText(cleanForSpeech(s.text), pickVoice(s.text));
+      if (token !== reader.token || !state.playing) return;
+      if (result === 'error') {
+        pause();
+        toast('The voice couldn’t read this. Try another voice in Settings.', 4000);
+        return;
+      }
+      reader.spoken++;
+      reader.idx++;
+    }
+  }
+
+  async function startReading() {
+    const token = ++reader.token;
+    if (!TTS && !webSpeech) {
+      pause();
+      toast('Read aloud isn’t available in this browser.', 3500);
+      return;
+    }
+    reader.spoken = 0;
+    if (!voiceList.length) await loadVoices();
+    if (readerMoved() || !reader.queue.length) await readerSeek(readingPoint());
+    if (token !== reader.token || !state.playing) return;
+    readLoop(token);
+  }
+
+  // Move the reading position (next/previous sentence, paragraph, or a tapped spot)
+  async function readerJump(move) {
+    if (!state.doc) return;
+    const token = ++reader.token;
+    stopSpeech();
+    if (readerMoved() || !reader.queue.length) await readerSeek(readingPoint());
+    await move();
+    if (token !== reader.token) return;
+    const s = await readerCurrent();
+    if (token !== reader.token) return;
+    if (!s) {
+      if (state.playing) { pause(); toast('Finished reading.'); }
+      return;
+    }
+    showSentence(s);
+    if (state.playing) readLoop(token);
+  }
+
+  async function renderVoices() {
+    const sel = els.voiceSelect;
+    els.voiceMore.hidden = !TTS;
+    if (!TTS && !webSpeech) {
+      els.voiceHint.textContent = 'Read aloud isn’t available in this browser.';
+      sel.disabled = true;
+      return;
+    }
+    els.voiceHint.textContent = TTS
+      ? 'Voices come from your phone. “Get more voices” opens Android’s voice downloads, where higher-quality voices are free. Voices marked online need internet.'
+      : 'Voices come from your browser and computer.';
+    const list = await loadVoices();
+    const rank = (lang) => (/^en/i.test(lang) ? 0 : /^ne/i.test(lang) ? 1 : /^hi/i.test(lang) ? 2 : 3);
+    const sorted = [...list].sort((a, b) => rank(a.lang) - rank(b.lang) || a.lang.localeCompare(b.lang) || (a.online - b.online) || a.name.localeCompare(b.name));
+    const groups = new Map();
+    for (const v of sorted) {
+      if (!groups.has(v.lang)) groups.set(v.lang, []);
+      groups.get(v.lang).push(v);
+    }
+    sel.replaceChildren(new Option('Automatic (phone’s default)', ''));
+    for (const [lang, voices] of groups) {
+      const og = document.createElement('optgroup');
+      og.label = langName(lang);
+      voices.forEach((v) => {
+        const label = TTS ? `${langName(v.lang)} ${voiceList.filter((x) => x.lang === v.lang).indexOf(v) + 1}` : v.name;
+        og.appendChild(new Option(label + (v.online ? ' · online' : ''), v.id));
+      });
+      sel.appendChild(og);
+    }
+    sel.value = chosenVoice() ? settings.voice : '';
+    if (!list.length) els.voiceHint.textContent = 'No voices were found. Check that a text-to-speech engine is installed on this device.';
+  }
+
+  els.voiceSelect.addEventListener('change', () => {
+    settings.voice = els.voiceSelect.value;
+    saveSettings();
+    syncUI();
+    if (isSpeak() && state.playing) readerJump(async () => {}); // re-read this sentence in the new voice
+  });
+  $('#voiceTest').addEventListener('click', async () => {
+    if (state.playing) pause();
+    await loadVoices();
+    const v = chosenVoice();
+    const nepali = v && /^ne/i.test(v.lang);
+    stopSpeech();
+    speakText(nepali ? 'नमस्ते, यो आवाजले तपाईंलाई यसरी पढेर सुनाउँछ।' : 'Hello. This is how this voice sounds when it reads to you.', v);
+  });
+  els.voiceMore.addEventListener('click', () => { if (TTS) callNative(() => TTS.openInstall()); });
 
   // ---------- Themes ----------
   const darkQuery = matchMedia('(prefers-color-scheme: dark)');
@@ -2203,6 +2680,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     const root = document.documentElement;
     root.dataset.theme = settings.theme;
     root.dataset.pdfInvert = settings.pdfInvert ? 'on' : 'off';
+    root.dataset.accent = settings.accent;
+    root.dataset.contrast = settings.contrast;
     document.body.classList.toggle('mirror', settings.mirror);
     els.themeMeta.setAttribute('content', getComputedStyle(root).getPropertyValue('--chrome-solid').trim() || '#F8F9FB');
     const SystemBars = isNative && Cap.Plugins.SystemBars;
@@ -2366,7 +2845,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     }
     let hay = text.toLowerCase();
     if (hay.length !== text.length) hay = text;
-    doc.pageText[n] = { hay: hay.replace(/\s/g, ' '), mapItem, mapOff, items };
+    doc.pageText[n] = { text, hay: hay.replace(/\s/g, ' '), mapItem, mapOff, items };
     return doc.pageText[n];
   }
 
@@ -2547,19 +3026,27 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   function syncUI() {
-    const flipMode = isFlip();
-    els.speed.value = flipMode ? sliderFromSecs(settings.flipSeconds) : sliderFromSpeed(settings.speed);
-    els.speed.setAttribute('aria-label', flipMode ? 'Seconds per page' : 'Scroll speed');
-    els.speedOut.innerHTML = flipMode ? `<b>${settings.flipSeconds}</b> s/page` : `<b>${settings.speed}</b> lines/min`;
-    $('#slower').title = $('#slower').ariaLabel = flipMode ? 'Fewer seconds per page' : 'Slower';
-    $('#faster').title = $('#faster').ariaLabel = flipMode ? 'More seconds per page' : 'Faster';
-    $('#upOne').title = $('#upOne').ariaLabel = flipMode ? 'Previous page' : 'Back one line';
-    $('#downOne').title = $('#downOne').ariaLabel = flipMode ? 'Next page' : 'Forward one line';
+    const flipMode = isFlip(), speakMode = isSpeak();
+    document.body.classList.toggle('mode-speak', speakMode);
+    if (speakMode) {
+      els.speed.value = sliderFromRate(settings.voiceRate);
+      els.speed.setAttribute('aria-label', 'Voice speed');
+      els.speedOut.innerHTML = `<b>${fmtRate(settings.voiceRate)}</b> voice`;
+    } else {
+      els.speed.value = flipMode ? sliderFromSecs(settings.flipSeconds) : sliderFromSpeed(settings.speed);
+      els.speed.setAttribute('aria-label', flipMode ? 'Seconds per page' : 'Scroll speed');
+      els.speedOut.innerHTML = flipMode ? `<b>${settings.flipSeconds}</b> s/page` : `<b>${settings.speed}</b> lines/min`;
+    }
+    $('#slower').title = $('#slower').ariaLabel = speakMode ? 'Slower voice' : flipMode ? 'Fewer seconds per page' : 'Slower';
+    $('#faster').title = $('#faster').ariaLabel = speakMode ? 'Faster voice' : flipMode ? 'More seconds per page' : 'Faster';
+    $('#upOne').title = $('#upOne').ariaLabel = speakMode ? 'Previous sentence' : flipMode ? 'Previous page' : 'Back one line';
+    $('#downOne').title = $('#downOne').ariaLabel = speakMode ? 'Next sentence' : flipMode ? 'Next page' : 'Forward one line';
     els.pdfInvert.checked = settings.pdfInvert;
     els.mirrorToggle.checked = settings.mirror;
     $$('[data-jump]').forEach((n) => { n.textContent = settings.jump; });
-    $('#upMany').title = $('#upMany').ariaLabel = `Back ${settings.jump} lines`;
-    $('#downMany').title = $('#downMany').ariaLabel = `Forward ${settings.jump} lines`;
+    $('#upMany').title = $('#upMany').ariaLabel = speakMode ? 'Previous paragraph' : `Back ${settings.jump} lines`;
+    $('#downMany').title = $('#downMany').ariaLabel = speakMode ? 'Next paragraph' : `Forward ${settings.jump} lines`;
+    $$('[data-jump]').forEach((n) => { n.hidden = speakMode; });
     els.jumpOut.textContent = `${settings.jump} lines`;
     $$('.only-pages [data-zoom-out]').forEach((o) => { o.textContent = `${Math.round(settings.zoom * 100)}%`; });
     $$('.only-text [data-zoom-out]').forEach((o) => { o.textContent = `${Math.round(settings.textZoom * 100)}%`; });
@@ -2613,12 +3100,13 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   els.play.addEventListener('click', togglePlay);
   $('#upOne').addEventListener('click', () => stepOne(-1));
   $('#downOne').addEventListener('click', () => stepOne(1));
-  $('#upMany').addEventListener('click', () => stepLines(-settings.jump));
-  $('#downMany').addEventListener('click', () => stepLines(settings.jump));
+  $('#upMany').addEventListener('click', () => jumpMany(-1));
+  $('#downMany').addEventListener('click', () => jumpMany(1));
   $('#slower').addEventListener('click', () => nudgeSpeed(-1));
   $('#faster').addEventListener('click', () => nudgeSpeed(1));
   els.speed.addEventListener('input', () => {
-    if (isFlip()) setFlipSeconds(secsFromSlider(+els.speed.value));
+    if (isSpeak()) setRate(rateFromSlider(+els.speed.value));
+    else if (isFlip()) setFlipSeconds(secsFromSlider(+els.speed.value));
     else setSpeed(speedFromSlider(+els.speed.value));
   });
 
@@ -2656,7 +3144,11 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   document.addEventListener('fullscreenchange', onFsChange);
   document.addEventListener('webkitfullscreenchange', onFsChange);
 
-  $('#settingsBtn').addEventListener('click', () => { syncUI(); els.settings.showModal(); });
+  $('#settingsBtn').addEventListener('click', () => {
+    syncUI();
+    if (isSpeak()) renderVoices();
+    els.settings.showModal();
+  });
   for (const dlg of [els.settings, els.library]) {
     dlg.addEventListener('click', (e) => {
       if (e.target === dlg || e.target.closest('[data-close]')) dlg.close();
@@ -2673,7 +3165,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       if (key === 'orientation') { setOrientation(val); return; }
       if (key === 'view') { setView(val); return; }
       if (key === 'motion') { setMotion(val); return; }
-      if (key === 'theme') { settings.theme = val; saveSettings(); applyTheme(); syncUI(); return; }
+      if (key === 'theme' || key === 'accent' || key === 'contrast') { settings[key] = val; saveSettings(); applyTheme(); syncUI(); return; }
       settings[key] = val;
       if (key === 'stopAfter') state.timerLeft = state.playing && val > 0 ? val * 60 : 0;
       saveSettings();
@@ -2791,6 +3283,12 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     if (!state.doc) return;
     const sel = window.getSelection && window.getSelection();
     if (sel && String(sel)) return;
+    if (isSpeak() && state.playing) {
+      // While reading aloud, a tap moves the voice to what you tapped
+      const y = e.clientY - v.getBoundingClientRect().top + v.scrollTop;
+      readerJump(() => readerSeek(y - linePx()));
+      return;
+    }
     document.body.classList.toggle('immersive');
   });
 
@@ -2806,8 +3304,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     let handled = true;
     switch (e.key) {
       case ' ': case 'k': case 'K': togglePlay(); break;
-      case 'ArrowDown': if (e.shiftKey) stepLines(settings.jump); else stepOne(1); break;
-      case 'ArrowUp': if (e.shiftKey) stepLines(-settings.jump); else stepOne(-1); break;
+      case 'ArrowDown': if (e.shiftKey) jumpMany(1); else stepOne(1); break;
+      case 'ArrowUp': if (e.shiftKey) jumpMany(-1); else stepOne(-1); break;
       case '/': openSearch(); break;
       case '+': case '=': nudgeSpeed(1); break;
       case '-': case '_': nudgeSpeed(-1); break;

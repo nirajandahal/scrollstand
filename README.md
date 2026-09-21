@@ -6,10 +6,11 @@ Hands-free reader for PDFs, EPUB ebooks, Word (.docx) and text (.txt, .md) files
 
 - Smooth auto-scroll with a speed in lines per minute, one-line and several-line jumps, a start countdown and a stop timer
 - Page-flip mode: turns a whole page every N seconds (for sheet music, lyrics and slides)
+- Read aloud: reads sentence by sentence with the phone's own voices (Nepali text switches to a Nepali voice when one is installed), highlighting and scrolling along
 - Library: every file you open is kept on the device (IndexedDB) with your reading position, so you can reopen it and carry on
 - Reopens the file you were reading, at the same spot, when the app starts again
 - Search inside the file, with highlights on PDF pages and in text view
-- Themes: System, Light, Sepia and Night (PDF pages are tinted or darkened to match), plus a teleprompter mirror mode
+- Themes: System, Light, Sepia and Night (PDF pages are tinted or darkened to match), an Amber or Saffron colour, Soft or High dark contrast, plus a teleprompter mirror mode
 - Pinch to zoom (two fingers on a phone, pinch or Ctrl + scroll on a computer)
 - Text view: PDFs can be reflowed as plain text; Word and text files always open this way. Choose the font (including Mukta for Nepali), text size and line spacing
 - Reading guide band, orientation lock, full screen, keeps the screen on while scrolling
