@@ -177,6 +177,25 @@ body[data-preview] #frame { border: 6px solid var(--chrome-solid); border-radius
   box-shadow: 0 1px 2px rgba(15, 20, 30, .22), 0 4px 14px rgba(15, 20, 30, .08);
 }
 .page canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* Until a page is drawn it says so, instead of sitting blank */
+.page::after {
+  content: "Loading page " attr(data-n) "…"; position: absolute; left: 0; right: 0; top: 38%;
+  text-align: center; font-family: var(--font); font-size: 14px; color: #8A94A6; pointer-events: none;
+}
+.page.drawn::after { content: none; }
+/* Background work (checking pages, loading text) shows here without blocking reading */
+#busy {
+  position: fixed; left: 50%; top: calc(var(--hh) + 10px); z-index: 6; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; max-width: calc(100% - 32px);
+  padding: 6px 14px 6px 10px; border-radius: 16px; background: var(--chrome-solid); color: var(--muted);
+  font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(15, 20, 30, .18); pointer-events: none;
+}
+#busyText { overflow: hidden; text-overflow: ellipsis; }
+body.searching #busy { top: calc(var(--hh) + 64px); }
+body.immersive #busy { top: calc(var(--sat) + 10px); }
+.spin { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--rule); border-top-color: var(--amber); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 /* Themes reach PDF pages too: sepia tints the paper, night inverts it */
 :root[data-theme="sepia"] .page canvas { mix-blend-mode: multiply; }
 :root[data-theme="night"][data-pdf-invert="on"] .page { background: #1E1F24; }
@@ -767,6 +786,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
 </dialog>
 
 <input type="file" id="fileInput" accept="application/pdf,.pdf,.epub,application/epub+zip,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.txt,.md,text/plain,text/markdown" hidden>
+<div id="busy" role="status" aria-live="polite" hidden><span class="spin" aria-hidden="true"></span><span id="busyText"></span></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -786,6 +806,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     lineHint: $('#lineHint'), guideToggle: $('#guideToggle'), stopCustom: $('#stopCustom'), orientHint: $('#orientHint'),
     fontGrid: $('#fontGrid'), bookList: $('#bookList'), libEmpty: $('#libEmpty'), libFoot: $('#libFoot'),
     libUsage: $('#libUsage'), recent: $('#recent'), recentList: $('#recentList'), libCloseDoc: $('#libCloseDoc'),
+    busy: $('#busy'), busyText: $('#busyText'),
     searchBtn: $('#searchBtn'), searchBar: $('#searchBar'), searchInput: $('#searchInput'), searchCount: $('#searchCount'),
     pdfInvert: $('#pdfInvert'), mirrorToggle: $('#mirrorToggle'),
     guidePos: $('#guidePos'), guidePosOut: $('#guidePosOut'), guideLines: $('#guideLines'), guideLinesOut: $('#guideLinesOut'),
@@ -843,11 +864,21 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     playing: false, pos: 0, expected: 0, holding: false, holdUntil: 0,
     anim: null, raf: 0, last: 0,
     timerLeft: 0, countdown: null, wake: null, locked: false, nativeFs: false,
-    flipLeft: 0, blockIndex: new Map(),
+    flipLeft: 0, blockIndex: new Map(), drawing: 0,
   };
 
   const pdfjsLib = window.pdfjsLib;
   if (pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDF_WORKER;
+  // One PDF engine for the whole session, started when the app opens, so opening a file
+  // doesn't wait for the engine to boot (that was most of the wait on phones)
+  let pdfWorker = null;
+  function sharedPdfWorker() {
+    if (!pdfjsLib) return undefined;
+    if (!pdfWorker || pdfWorker.destroyed) {
+      try { pdfWorker = new pdfjsLib.PDFWorker({ name: 'scrollstand' }); } catch (err) { console.warn(err); pdfWorker = null; }
+    }
+    return pdfWorker || undefined;
+  }
 
   // Running inside the Android app? Native plugins replace browser-only features there.
   const Cap = window.Capacitor;
@@ -1130,6 +1161,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     saveProgress();
     closeSearch();
     resetReader();
+    busyJobs.clear();
+    setBusy('', null);
     observer.disconnect();
     state.pages.forEach(releasePage);
     els.pages.replaceChildren();
@@ -1156,7 +1189,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   async function loadPdf(doc, bytes) {
-    const task = pdfjsLib.getDocument({ data: bytes });
+    const task = pdfjsLib.getDocument({ data: bytes, worker: sharedPdfWorker() });
     task.onPassword = (update, reason) => {
       const again = reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD;
       const pw = prompt(again ? 'That password didn’t work. Try again:' : 'This PDF is password-protected. Enter the password:');
@@ -1171,6 +1204,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     }
     doc.pdf = pdf;
     doc.pageCount = pdf.numPages;
+    setLoading(`Opening ${pdf.numPages}-page PDF…`);
     // Only the first page is needed to start showing the document; the rest load as needed
     const first = await pdf.getPage(1);
     const vp1 = first.getViewport({ scale: 1 });
@@ -1181,6 +1215,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       el.className = 'page';
       el.dataset.i = n - 1;
       el.setAttribute('aria-label', `Page ${n}`);
+      el.dataset.n = n;
       pages.push({
         num: n, pdf, page: n === 1 ? first : null, sized: n === 1, w: vp1.width, h: vp1.height,
         el, canvas: null, task: null, rendering: 0, visible: false, cssW: 0, cssH: 0,
@@ -1190,6 +1225,34 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     doc.pageList = pages;
     doc.frag = frag;
     doc.linePt = 14; // refined in the background once the document is showing
+  }
+
+  // Background jobs report progress in the pill under the top bar, with a time estimate
+  const busyJobs = new Map();
+  function setBusy(key, text) {
+    if (text) busyJobs.set(key, text); else busyJobs.delete(key);
+    const first = busyJobs.values().next().value;
+    els.busy.hidden = !first;
+    if (first) els.busyText.textContent = first;
+  }
+  function progressText(label, done, total, startedAt) {
+    const elapsed = (performance.now() - startedAt) / 1000;
+    let eta = '';
+    if (done >= 8 && elapsed > 1 && done < total) {
+      const left = ((total - done) * elapsed) / done;
+      if (left >= 2) eta = ` · about ${left < 60 ? `${Math.ceil(left)} s` : `${Math.ceil(left / 60)} min`} left`;
+    }
+    return `${label} · ${done} of ${total}${eta}`;
+  }
+  // Drawing what's on screen always goes first; background work waits for it
+  async function waitForDrawing(doc) {
+    while (state.drawing > 0 && state.doc === doc) await new Promise((r) => setTimeout(r, 60));
+  }
+  async function waitForFirstDraw(doc) {
+    const until = performance.now() + 5000;
+    while (state.doc === doc && !els.pages.querySelector('.page.drawn') && state.view === 'pages' && performance.now() < until) {
+      await new Promise((r) => setTimeout(r, 60));
+    }
   }
 
   // Load a page on first use; pages assume the first page's size until then
@@ -1211,16 +1274,25 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
 
   // After the document is on screen: measure line spacing, then check the other pages' sizes
   async function finishPdfSetup(doc) {
+    await waitForFirstDraw(doc);
+    await waitForDrawing(doc);
+    if (state.doc !== doc) return;
     const lp = await detectLineHeight(doc.pdf);
     if (state.doc !== doc) return;
     state.linePt = lp;
     layout(true);
     const pages = doc.pageList;
-    for (let i = 0; i < pages.length; i += 8) {
-      if (state.doc !== doc) return;
-      await Promise.all(pages.slice(i, i + 8).map((p) => getPg(p).catch(() => null)));
-      await new Promise((r) => setTimeout(r, 16));
+    const started = performance.now();
+    const showProgress = pages.length > 40;
+    for (let i = 0; i < pages.length; i += 6) {
+      await waitForDrawing(doc);
+      if (state.doc !== doc) { setBusy('pages', null); return; }
+      await Promise.all(pages.slice(i, i + 6).map((p) => getPg(p).catch(() => null)));
+      const done = Math.min(pages.length, i + 6);
+      if (showProgress) setBusy('pages', progressText('Checking pages', done, pages.length, started));
+      await new Promise((r) => setTimeout(r, 20));
     }
+    setBusy('pages', null);
   }
 
   // Estimate the typical distance between text lines (in PDF points)
@@ -1271,9 +1343,10 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
         doc.textParts = [];
         doc.textNext = 0;
         const target = clamp(needPage, 0, doc.pageCount - 1);
+        const started = performance.now();
         do {
           await extractPdfBatch(doc, 6);
-          setLoading(`Preparing text view… page ${doc.textNext} of ${doc.pageCount}`);
+          setLoading(progressText('Preparing text view', doc.textNext, target + 1, started));
         } while (doc.textNext <= target);
         doc.text = doc.textParts.join('');
         if (doc.textNext < doc.pageCount) continuePdfText(doc);
@@ -1313,11 +1386,15 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   async function continuePdfText(doc) {
     if (doc.textStreaming) return;
     doc.textStreaming = true;
+    const started = performance.now(), startPage = doc.textNext;
     while (doc.textNext < doc.pageCount) {
-      if (state.doc && state.doc !== doc) { doc.textStreaming = false; return; }
+      await waitForDrawing(doc);
+      if (state.doc && state.doc !== doc) { doc.textStreaming = false; setBusy('text', null); return; }
       const before = doc.textParts.length;
       await extractPdfBatch(doc, 8);
-      if (state.doc && state.doc !== doc) { doc.textStreaming = false; return; }
+      if (state.doc && state.doc !== doc) { doc.textStreaming = false; setBusy('text', null); return; }
+      setBusy('text', progressText('Loading text', doc.textNext, doc.pageCount,
+        started - ((performance.now() - started) * startPage) / Math.max(1, doc.textNext - startPage)));
       const html = doc.textParts.slice(before).join('');
       doc.text += html;
       if (state.view === 'text' && els.flow.dataset.doc === doc.id) {
@@ -1327,6 +1404,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       await new Promise((r) => setTimeout(r, 30));
     }
     doc.textStreaming = false;
+    setBusy('text', null);
     DB.put('renders', doc.text, `${doc.id}:text`).catch(() => {});
   }
   // Is more text still arriving below what's shown?
@@ -1784,14 +1862,15 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   // Where pictures sit on a page (as fractions of the page), so they can keep their colours
-  async function pageImageRects(p) {
+  async function pageImageRects(p, drawnOps) {
     if (p.imageRects) return p.imageRects;
     const OPS = pdfjsLib.OPS, Util = pdfjsLib.Util;
     const imageOps = new Set([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintJpegXObject].filter((x) => x !== undefined));
     const rects = [];
     try {
       const page = await getPg(p);
-      const ops = await page.getOperatorList();
+      // Reuse the instructions from drawing the page when we have them (reading the page again is slow)
+      const ops = drawnOps && drawnOps.fnArray && drawnOps.fnArray.length ? drawnOps : await page.getOperatorList();
       const vp = page.getViewport({ scale: 1 });
       const stack = [];
       let ctm = [1, 0, 0, 1, 0, 0];
@@ -1821,8 +1900,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   // Darken a rendered page, then paint the pictures back in their real colours
-  async function darkenPage(p, canvas, mode) {
-    const rects = await pageImageRects(p);
+  async function darkenPage(p, canvas, mode, drawnOps) {
+    const rects = await pageImageRects(p, drawnOps);
     const out = document.createElement('canvas');
     out.width = canvas.width;
     out.height = canvas.height;
@@ -1840,6 +1919,11 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   async function renderPage(p) {
+    state.drawing = (state.drawing || 0) + 1;
+    try { await drawPage(p); } finally { state.drawing--; }
+  }
+
+  async function drawPage(p) {
     const scale = state.scale;
     const dark = pdfDarkMode();
     const want = `${scale}|${dark}`;
@@ -1869,13 +1953,14 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     }
     if (p.task !== task) return;
     let shown = canvas;
-    if (dark) shown = await darkenPage(p, canvas, dark);
+    if (dark) shown = await darkenPage(p, canvas, dark, task._internalRenderTask && task._internalRenderTask.operatorList);
     if (p.task !== task) { shown.width = shown.height = 0; return; }
     p.task = null;
     p.rendering = 0;
     if (!p.visible || !p.el.isConnected) { shown.width = shown.height = 0; return; }
     if (p.canvas) { p.canvas.width = p.canvas.height = 0; p.canvas.remove(); }
     p.el.appendChild(shown);
+    p.el.classList.add('drawn');
     p.canvas = shown;
     p.rendered = want;
   }
@@ -1884,6 +1969,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     if (p.task) { p.task.cancel(); p.task = null; }
     p.rendering = 0;
     if (p.canvas) { p.canvas.width = p.canvas.height = 0; p.canvas.remove(); p.canvas = null; }
+    p.el.classList.remove('drawn');
     p.rendered = '';
   }
 
@@ -2867,6 +2953,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     pause();
     search.open = true;
     els.searchBar.hidden = false;
+    document.body.classList.add('searching');
     els.searchBtn.setAttribute('aria-pressed', 'true');
     document.body.classList.remove('immersive');
     els.searchInput.focus();
@@ -2879,6 +2966,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     clearTimeout(search.timer);
     clearSearchResults();
     els.searchBar.hidden = true;
+    document.body.classList.remove('searching');
     els.searchInput.value = '';
     els.searchInput.blur();
     els.searchBtn.setAttribute('aria-pressed', 'false');
@@ -3602,6 +3690,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   // ---------- Start ----------
+  setTimeout(() => sharedPdfWorker(), 200); // warm up the PDF engine while the home screen shows
   buildFontGrid();
   applyTheme();
   measureChrome();
