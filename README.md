@@ -13,7 +13,7 @@ Hands-free reader for PDFs, EPUB ebooks, Word (.docx) and text (.txt, .md) files
 - Themes: System, Light, Sepia and Night (PDF pages are tinted or darkened to match), a saffron accent, Soft or High dark contrast (pictures in PDFs keep their colours), plus a teleprompter mirror mode
 - Pinch to zoom (two fingers on a phone, pinch or Ctrl + scroll on a computer)
 - Text view: PDFs can be reflowed as plain text; Word and text files always open this way. Choose the font (including Mukta for Nepali), text size and line spacing
-- Reading guide band you can move (slider or drag its arrows), orientation lock, full screen, keeps the screen on while scrolling
+- Reading guide band you can move and resize (sliders, or drag its arrows and bottom grip), orientation lock, full screen, keeps the screen on while scrolling
 
 Old `.doc` files and copy-protected (DRM) EPUBs aren't supported; save Word files as `.docx` first. Scanned PDFs have no text, so only the page view works for them.
 

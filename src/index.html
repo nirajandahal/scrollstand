@@ -243,6 +243,11 @@ body:not(.view-pages) #pages { display: none; }
 /* Grab the arrows at either end to move the guide */
 .gh { position: absolute; top: 50%; width: 40px; height: max(48px, 100%); transform: translateY(-50%); pointer-events: auto; touch-action: none; cursor: ns-resize; }
 .gh-l { left: 0; } .gh-r { right: 0; }
+.gh-b { left: 50%; top: auto; bottom: 0; width: 76px; height: 30px; transform: translate(-50%, 50%); }
+.gh-b::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 34px; height: 5px; border-radius: 3px;
+  background: var(--amber); transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--chrome-solid);
+}
 body.guide-drag #guide { box-shadow: 0 0 0 2px var(--amber); }
 body.has-doc.guide-on #guide { display: block; }
 body.pinching #guide { opacity: .4; }
@@ -480,7 +485,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       <div id="pages"></div>
       <div id="flowWrap"><article id="flow"></article></div>
     </div>
-    <div id="guide" aria-hidden="true"><span class="gh gh-l" title="Drag to move the guide"></span><span class="gh gh-r" title="Drag to move the guide"></span></div>
+    <div id="guide" aria-hidden="true"><span class="gh gh-l" title="Drag to move the guide"></span><span class="gh gh-r" title="Drag to move the guide"></span><span class="gh gh-b" title="Drag to make the guide taller or shorter"></span></div>
     <div id="countdown" aria-live="assertive"><span id="countNum">3</span></div>
     <div id="loading" aria-live="polite"><span id="loadingText">Opening…</span></div>
     <div id="empty">
@@ -730,7 +735,9 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       </div>
       <h4 class="subhead">Position <span class="hint" id="guidePosOut"></span></h4>
       <input type="range" id="guidePos" min="12" max="75" step="1" aria-label="Guide position">
-      <p class="hint" style="margin-top:6px">You can also drag the arrows at either end of the guide.</p>
+      <h4 class="subhead">Height <span class="hint" id="guideLinesOut"></span></h4>
+      <input type="range" id="guideLines" min="1" max="8" step="0.5" aria-label="Guide height in lines">
+      <p class="hint" style="margin-top:6px">You can also drag the guide itself: the arrows at either end move it, and the grip at the bottom makes it taller or shorter.</p>
     </section>
 
     <section class="set row-set">
@@ -781,7 +788,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     libUsage: $('#libUsage'), recent: $('#recent'), recentList: $('#recentList'), libCloseDoc: $('#libCloseDoc'),
     searchBtn: $('#searchBtn'), searchBar: $('#searchBar'), searchInput: $('#searchInput'), searchCount: $('#searchCount'),
     pdfInvert: $('#pdfInvert'), mirrorToggle: $('#mirrorToggle'),
-    guidePos: $('#guidePos'), guidePosOut: $('#guidePosOut'),
+    guidePos: $('#guidePos'), guidePosOut: $('#guidePosOut'), guideLines: $('#guideLines'), guideLinesOut: $('#guideLinesOut'),
     voiceSelect: $('#voiceSelect'), voiceHint: $('#voiceHint'), voiceMore: $('#voiceMore'), themeMeta: document.querySelector('meta[name="theme-color"]'),
   };
 
@@ -819,7 +826,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   };
   const DEFAULTS = {
     speed: 40, jump: 3, delay: 0, stopAfter: 0, orientation: 'auto', guide: true,
-    zoom: 1, lineFactor: 1, textZoom: 1, font: 'atkinson', lineHeight: 1.6, guidePos: 0.3,
+    zoom: 1, lineFactor: 1, textZoom: 1, font: 'atkinson', lineHeight: 1.6, guidePos: 0.3, guideLines: 2,
     theme: 'system', pdfInvert: true, mirror: false, motion: 'scroll', flipSeconds: 20,
     contrast: 'soft', voice: '', voiceRate: 1, voicePitch: 1,
   };
@@ -1099,7 +1106,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     document.body.dataset.kind = meta.kind;
 
     let view = meta.kind === 'pdf' ? (meta.view || 'pages') : 'text';
-    if (view === 'text' && !(await ensurePdfText(doc))) view = 'pages';
+    if (view === 'text' && !(await ensurePdfText(doc, meta.page || 0))) view = 'pages';
+    if (doc.pdf) finishPdfSetup(doc);
     setLoading(false);
     await showView(view, targetFromMeta(meta, view));
 
@@ -1163,33 +1171,67 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     }
     doc.pdf = pdf;
     doc.pageCount = pdf.numPages;
+    // Only the first page is needed to start showing the document; the rest load as needed
+    const first = await pdf.getPage(1);
+    const vp1 = first.getViewport({ scale: 1 });
     const frag = document.createDocumentFragment();
     const pages = [];
     for (let n = 1; n <= pdf.numPages; n++) {
-      const page = await pdf.getPage(n);
-      const vp = page.getViewport({ scale: 1 });
       const el = document.createElement('div');
       el.className = 'page';
       el.dataset.i = n - 1;
       el.setAttribute('aria-label', `Page ${n}`);
-      pages.push({ page, w: vp.width, h: vp.height, el, canvas: null, task: null, rendering: 0, renderedScale: 0, visible: false, cssW: 0, cssH: 0 });
+      pages.push({
+        num: n, pdf, page: n === 1 ? first : null, sized: n === 1, w: vp1.width, h: vp1.height,
+        el, canvas: null, task: null, rendering: 0, visible: false, cssW: 0, cssH: 0,
+      });
       frag.appendChild(el);
-      if (n % 25 === 0) setLoading(`Reading page ${n} of ${pdf.numPages}…`);
     }
     doc.pageList = pages;
     doc.frag = frag;
-    setLoading('Measuring line spacing…');
-    doc.linePt = await detectLineHeight(pdf);
+    doc.linePt = 14; // refined in the background once the document is showing
+  }
+
+  // Load a page on first use; pages assume the first page's size until then
+  async function getPg(p) {
+    if (!p.page) {
+      p.page = await p.pdf.getPage(p.num);
+      if (!p.sized) {
+        p.sized = true;
+        const vp = p.page.getViewport({ scale: 1 });
+        if (Math.abs(vp.width - p.w) > 0.5 || Math.abs(vp.height - p.h) > 0.5) {
+          p.w = vp.width;
+          p.h = vp.height;
+          if (state.doc && state.doc.pdf === p.pdf) scheduleLayout();
+        }
+      }
+    }
+    return p.page;
+  }
+
+  // After the document is on screen: measure line spacing, then check the other pages' sizes
+  async function finishPdfSetup(doc) {
+    const lp = await detectLineHeight(doc.pdf);
+    if (state.doc !== doc) return;
+    state.linePt = lp;
+    layout(true);
+    const pages = doc.pageList;
+    for (let i = 0; i < pages.length; i += 8) {
+      if (state.doc !== doc) return;
+      await Promise.all(pages.slice(i, i + 8).map((p) => getPg(p).catch(() => null)));
+      await new Promise((r) => setTimeout(r, 16));
+    }
   }
 
   // Estimate the typical distance between text lines (in PDF points)
   async function detectLineHeight(pdf) {
     const sizes = [], gaps = [];
-    const n = Math.min(pdf.numPages, 6);
-    for (let i = 1; i <= n; i++) {
+    const n = Math.min(pdf.numPages, 4);
+    const contents = await Promise.all(Array.from({ length: n }, (_, k) => pdf.getPage(k + 1)
+      .then((page) => page.getTextContent()).catch(() => null)));
+    for (const tc of contents) {
+      if (!tc) continue;
       try {
-        const page = await pdf.getPage(i);
-        const tc = await page.getTextContent();
         const ys = new Set();
         for (const it of tc.items) {
           if (!it.str || !it.str.trim() || !it.transform) continue;
@@ -1211,7 +1253,9 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   // ---------- Building text view content ----------
-  async function ensurePdfText(doc) {
+  // Text view for PDFs is built page by page: it shows as soon as the pages up to the
+  // reading spot are ready, and the rest streams in underneath while you read.
+  async function ensurePdfText(doc, needPage = 0) {
     if (doc.text !== null) return !!doc.text;
     const key = `${doc.id}:text`;
     const cached = await DB.get('renders', key).catch(() => undefined);
@@ -1219,11 +1263,102 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       doc.text = cached;
     } else {
       setLoading('Preparing text view…');
-      doc.text = await pdfToHtml(doc.pdf);
-      DB.put('renders', doc.text, key).catch(() => {});
+      doc.textStats = await pdfTextStats(doc);
+      if (!doc.textStats) {
+        doc.text = '';
+        DB.put('renders', '', key).catch(() => {});
+      } else {
+        doc.textParts = [];
+        doc.textNext = 0;
+        const target = clamp(needPage, 0, doc.pageCount - 1);
+        do {
+          await extractPdfBatch(doc, 6);
+          setLoading(`Preparing text view… page ${doc.textNext} of ${doc.pageCount}`);
+        } while (doc.textNext <= target);
+        doc.text = doc.textParts.join('');
+        if (doc.textNext < doc.pageCount) continuePdfText(doc);
+        else DB.put('renders', doc.text, key).catch(() => {});
+      }
     }
     if (!doc.text) toast('This PDF has no selectable text (it may be scanned), so text view isn’t available.', 4000);
     return !!doc.text;
+  }
+
+  // Typical text size and line spacing, from a sample of pages
+  async function pdfTextStats(doc) {
+    const n = Math.min(doc.pageCount, 8);
+    const pages = await Promise.all(doc.pageList.slice(0, n).map((p) => getPg(p)
+      .then((page) => page.getTextContent()).then((tc) => linesFromItems(tc.items)).catch(() => [])));
+    const all = pages.flat();
+    if (!all.length) return null;
+    const bodyFs = median(all.map((l) => l.fs));
+    const gaps = [];
+    for (const lines of pages) {
+      for (let k = 1; k < lines.length; k++) {
+        const g = lines[k - 1].y - lines[k].y;
+        if (g >= bodyFs * 0.8 && g <= bodyFs * 2.5) gaps.push(g);
+      }
+    }
+    return { bodyFs, lineGap: median(gaps) || bodyFs * 1.2 };
+  }
+
+  async function extractPdfBatch(doc, size) {
+    const from = doc.textNext, to = Math.min(doc.pageCount, from + size);
+    const results = await Promise.all(doc.pageList.slice(from, to).map((p) => getPg(p)
+      .then((page) => page.getTextContent()).then((tc) => linesFromItems(tc.items)).catch(() => [])));
+    results.forEach((lines, k) => doc.textParts.push(pageToHtml(lines, from + k + 1, doc.textStats)));
+    doc.textNext = to;
+  }
+
+  async function continuePdfText(doc) {
+    if (doc.textStreaming) return;
+    doc.textStreaming = true;
+    while (doc.textNext < doc.pageCount) {
+      if (state.doc && state.doc !== doc) { doc.textStreaming = false; return; }
+      const before = doc.textParts.length;
+      await extractPdfBatch(doc, 8);
+      if (state.doc && state.doc !== doc) { doc.textStreaming = false; return; }
+      const html = doc.textParts.slice(before).join('');
+      doc.text += html;
+      if (state.view === 'text' && els.flow.dataset.doc === doc.id) {
+        els.flow.insertAdjacentHTML('beforeend', html);
+        scheduleLayout();
+      }
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    doc.textStreaming = false;
+    DB.put('renders', doc.text, `${doc.id}:text`).catch(() => {});
+  }
+  // Is more text still arriving below what's shown?
+  const textStillLoading = () => !!(state.doc && state.doc.textStreaming && state.view === 'text');
+
+  const PAGE_NUMBER = /^(page\s*)?\d{1,4}(\s*(of|\/)\s*\d{1,4})?$/i;
+  function pageToHtml(lines, n, { bodyFs, lineGap }) {
+    const out = [`<div class="pgmark" data-page="${n}">Page ${n}</div>`];
+    const kept = lines.filter((l, k) => !((k === 0 || k === lines.length - 1) && PAGE_NUMBER.test(l.text)));
+    let para = null, prev = null;
+    const flush = () => {
+      if (!para) return;
+      const tag = para.big ? 'h3' : 'p';
+      out.push(`<${tag} data-page="${n}">${esc(para.text)}</${tag}>`);
+      para = null;
+    };
+    for (const line of kept) {
+      const big = line.fs > bodyFs * 1.25;
+      const gap = prev ? prev.y - line.y : 0;
+      const breakHere = !para || big !== para.big || gap > lineGap * 1.45 || gap < -lineGap * 0.5;
+      if (breakHere) {
+        flush();
+        para = { big, text: line.text };
+      } else if (/[a-z\u00C0-\u024F]-$/.test(para.text) && /^[a-z\u00DF-\u00FF]/.test(line.text)) {
+        para.text = para.text.slice(0, -1) + line.text; // re-join a hyphenated word
+      } else {
+        para.text += ' ' + line.text;
+      }
+      prev = line;
+    }
+    flush();
+    return out.join('');
   }
 
   function linesFromItems(items) {
@@ -1250,62 +1385,6 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     return lines
       .map((l) => ({ text: l.text.replace(/\s+/g, ' ').trim(), y: l.y, fs: l.fs }))
       .filter((l) => l.text);
-  }
-
-  async function pdfToHtml(pdf) {
-    const pages = [];
-    for (let n = 1; n <= pdf.numPages; n++) {
-      try {
-        const page = await pdf.getPage(n);
-        const tc = await page.getTextContent();
-        pages.push(linesFromItems(tc.items));
-      } catch {
-        pages.push([]);
-      }
-      if (n % 5 === 0) setLoading(`Preparing text view… page ${n} of ${pdf.numPages}`);
-    }
-    const all = pages.flat();
-    if (!all.length) return '';
-    const bodyFs = median(all.map((l) => l.fs));
-    const gaps = [];
-    for (const lines of pages) {
-      for (let k = 1; k < lines.length; k++) {
-        const g = lines[k - 1].y - lines[k].y;
-        if (g >= bodyFs * 0.8 && g <= bodyFs * 2.5) gaps.push(g);
-      }
-    }
-    const lineGap = median(gaps) || bodyFs * 1.2;
-    const pageNumber = /^(page\s*)?\d{1,4}(\s*(of|\/)\s*\d{1,4})?$/i;
-
-    const out = [];
-    pages.forEach((lines, idx) => {
-      const n = idx + 1;
-      out.push(`<div class="pgmark" data-page="${n}">Page ${n}</div>`);
-      const kept = lines.filter((l, k) => !((k === 0 || k === lines.length - 1) && pageNumber.test(l.text)));
-      let para = null, prev = null;
-      const flush = () => {
-        if (!para) return;
-        const tag = para.big ? 'h3' : 'p';
-        out.push(`<${tag} data-page="${n}">${esc(para.text)}</${tag}>`);
-        para = null;
-      };
-      for (const line of kept) {
-        const big = line.fs > bodyFs * 1.25;
-        const gap = prev ? prev.y - line.y : 0;
-        const breakHere = !para || big !== para.big || gap > lineGap * 1.45 || gap < -lineGap * 0.5;
-        if (breakHere) {
-          flush();
-          para = { big, text: line.text };
-        } else if (/[a-z\u00C0-\u024F]-$/.test(para.text) && /^[a-z\u00DF-\u00FF]/.test(line.text)) {
-          para.text = para.text.slice(0, -1) + line.text; // re-join a hyphenated word
-        } else {
-          para.text += ' ' + line.text;
-        }
-        prev = line;
-      }
-      flush();
-    });
-    return out.join('');
   }
 
   function textToHtml(str) {
@@ -1574,7 +1653,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     if (!doc || doc.kind !== 'pdf' || view === state.view) return;
     const target = { type: 'page', ...pageAtRead() };
     if (view === 'text') {
-      const ok = await ensurePdfText(doc);
+      const ok = await ensurePdfText(doc, target.i);
       setLoading(false);
       if (!ok) { syncUI(); return; }
     }
@@ -1659,7 +1738,13 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   function drawGuide() {
     const lp = linePx();
     els.frame.style.setProperty('--guide-top', (state.guideTop - lp * 0.5) + 'px');
-    els.frame.style.setProperty('--guide-h', (lp * 2.2) + 'px');
+    els.frame.style.setProperty('--guide-h', (lp * (settings.guideLines + 0.2)) + 'px');
+  }
+  const GUIDE_LINES_MIN = 1, GUIDE_LINES_MAX = 8;
+  function setGuideLines(lines, commit) {
+    settings.guideLines = clamp(Math.round(lines * 2) / 2, GUIDE_LINES_MIN, GUIDE_LINES_MAX);
+    if (state.doc) drawGuide();
+    if (commit) { saveSettings(); syncUI(); }
   }
   // Move the reading guide; the page stays where it is on screen
   function setGuidePos(pos, commit) {
@@ -1705,8 +1790,9 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     const imageOps = new Set([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintJpegXObject].filter((x) => x !== undefined));
     const rects = [];
     try {
-      const ops = await p.page.getOperatorList();
-      const vp = p.page.getViewport({ scale: 1 });
+      const page = await getPg(p);
+      const ops = await page.getOperatorList();
+      const vp = page.getViewport({ scale: 1 });
       const stack = [];
       let ctm = [1, 0, 0, 1, 0, 0];
       for (let i = 0; i < ops.fnArray.length; i++) {
@@ -1759,15 +1845,19 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     const want = `${scale}|${dark}`;
     if (!p.cssW || p.rendered === want || p.rendering === want) return;
     if (p.task) { p.task.cancel(); p.task = null; }
+    p.rendering = want;
+    let page;
+    try { page = await getPg(p); } catch { if (p.rendering === want) p.rendering = 0; return; }
+    if (p.rendering !== want) return; // a newer request took over
     // Sharp on high-density screens, but capped to protect phone memory
     let out = Math.min(window.devicePixelRatio || 1, 2);
     const CAP = 10e6;
     if (p.cssW * p.cssH * out * out > CAP) out = Math.sqrt(CAP / (p.cssW * p.cssH));
-    const vp = p.page.getViewport({ scale: scale * out });
+    const vp = page.getViewport({ scale: scale * out });
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(vp.width);
     canvas.height = Math.floor(vp.height);
-    const task = p.page.render({ canvasContext: canvas.getContext('2d', { alpha: false }), viewport: vp });
+    const task = page.render({ canvasContext: canvas.getContext('2d', { alpha: false }), viewport: vp });
     p.task = task;
     p.rendering = want;
     try {
@@ -1937,7 +2027,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       state.pos = clamp(state.pos, 0, Math.max(0, max));
       state.expected = state.pos;
       v.scrollTop = state.pos;
-      if (state.playing && settings.motion === 'scroll' && atEnd(state.pos)) {
+      if (state.playing && settings.motion === 'scroll' && atEnd(state.pos) && !textStillLoading()) {
         pause();
         toast('Reached the end.');
       }
@@ -1998,7 +2088,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     if (!state.raf) state.pos = v.scrollTop;
     const base = state.anim ? state.pos + (1 - state.anim.done) * state.anim.dist : state.pos;
     state.flipLeft = settings.flipSeconds;
-    if (auto && atEnd(base)) {
+    if (auto && atEnd(base) && !textStillLoading()) {
       pause();
       toast('Reached the end.');
       return;
@@ -2583,7 +2673,11 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
   async function readerCurrent() {
     while (reader.idx >= reader.queue.length) {
-      if (reader.unit + 1 >= unitCount()) return null;
+      if (reader.unit + 1 >= unitCount()) {
+        if (!textStillLoading()) return null;
+        await new Promise((r) => setTimeout(r, 400)); // more text is on its way
+        continue;
+      }
       reader.unit++;
       reader.queue = await unitSentences(reader.unit);
       reader.idx = 0;
@@ -2891,7 +2985,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   async function pdfPageText(doc, n) {
     doc.pageText = doc.pageText || [];
     if (doc.pageText[n]) return doc.pageText[n];
-    const page = state.pages[n].page;
+    const page = await getPg(state.pages[n]);
     const vp = page.getViewport({ scale: 1 });
     const tc = await page.getTextContent();
     const items = [], mapItem = [], mapOff = [];
@@ -3001,9 +3095,18 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   }
 
   const ORIENTATIONS = ['auto', 'portrait', 'landscape'];
-  function cycleOrientation() {
-    const i = ORIENTATIONS.indexOf(settings.orientation);
-    setOrientation(ORIENTATIONS[(i + 1) % ORIENTATIONS.length]);
+  // The header button flips straight between portrait and landscape; Auto lives in Settings
+  function currentOrientation() {
+    if (settings.orientation !== 'auto') return settings.orientation;
+    if (document.body.dataset.preview) return document.body.dataset.preview;
+    return matchMedia('(orientation: landscape)').matches ? 'landscape' : 'portrait';
+  }
+  function toggleOrientation() {
+    const next = currentOrientation() === 'landscape' ? 'portrait' : 'landscape';
+    setOrientation(next);
+    const tip = store.get('scrollstand:seenOrientTip', false) ? '' : '. Auto-rotate is in Settings';
+    store.set('scrollstand:seenOrientTip', true);
+    toast(`Locked to ${next}${tip}`);
   }
 
   async function setOrientation(mode, { quiet = false } = {}) {
@@ -3127,6 +3230,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     els.guideToggle.checked = settings.guide;
     els.guidePos.value = Math.round(settings.guidePos * 100);
     els.guidePosOut.textContent = `· ${Math.round(settings.guidePos * 100)}% down the screen`;
+    els.guideLines.value = settings.guideLines;
+    els.guideLinesOut.textContent = `· ${settings.guideLines} ${settings.guideLines === 1 ? 'line' : 'lines'}`;
     document.body.classList.toggle('guide-on', guideOn());
 
     const current = { ...settings, view: state.view };
@@ -3141,7 +3246,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     const o = settings.orientation;
     const label = o.charAt(0).toUpperCase() + o.slice(1);
     els.orientBtn.querySelector('use').setAttribute('href', `#i-${o === 'auto' ? 'auto' : o}`);
-    els.orientBtn.title = els.orientBtn.ariaLabel = `Orientation: ${label}`;
+    const other = currentOrientation() === 'landscape' ? 'portrait' : 'landscape';
+    els.orientBtn.title = els.orientBtn.ariaLabel = `Orientation: ${label}. Tap for ${other}`;
     els.orientHint.textContent = isNative
       ? 'Locks the screen while you read.'
       : coarse
@@ -3205,7 +3311,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   els.mirrorToggle.addEventListener('change', () => { settings.mirror = els.mirrorToggle.checked; saveSettings(); applyTheme(); });
   els.libCloseDoc.addEventListener('click', () => { els.library.close(); leaveDoc(); });
 
-  els.orientBtn.addEventListener('click', cycleOrientation);
+  els.orientBtn.addEventListener('click', toggleOrientation);
   els.fsBtn.addEventListener('click', toggleFullscreen);
   if (!isNative && !(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) {
     els.fsBtn.hidden = true;
@@ -3296,7 +3402,30 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     els.guidePosOut.textContent = `· ${els.guidePos.value}% down the screen`;
   });
   els.guidePos.addEventListener('change', () => setGuidePos(+els.guidePos.value / 100, true));
-  $$('.gh').forEach((h) => {
+  els.guideLines.addEventListener('input', () => {
+    setGuideLines(+els.guideLines.value, false);
+    els.guideLinesOut.textContent = `· ${settings.guideLines} ${settings.guideLines === 1 ? 'line' : 'lines'}`;
+  });
+  els.guideLines.addEventListener('change', () => setGuideLines(+els.guideLines.value, true));
+  $('.gh-b').addEventListener('pointerdown', (e) => {
+    if (!state.doc || !guideOn()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const h = e.currentTarget;
+    h.setPointerCapture(e.pointerId);
+    document.body.classList.add('guide-drag');
+    const bandTop = document.querySelector('#guide').getBoundingClientRect().top;
+    const move = (ev) => setGuideLines((ev.clientY - bandTop) / linePx() - 0.2, false);
+    const up = () => {
+      h.removeEventListener('pointermove', move);
+      document.body.classList.remove('guide-drag');
+      setGuideLines(settings.guideLines, true);
+    };
+    h.addEventListener('pointermove', move);
+    h.addEventListener('pointerup', up, { once: true });
+    h.addEventListener('pointercancel', up, { once: true });
+  });
+  $$('.gh-l, .gh-r').forEach((h) => {
     h.addEventListener('pointerdown', (e) => {
       if (!state.doc || !guideOn()) return;
       e.preventDefault();
@@ -3410,7 +3539,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       case '+': case '=': nudgeSpeed(1); break;
       case '-': case '_': nudgeSpeed(-1); break;
       case 'f': case 'F': toggleFullscreen(); break;
-      case 'o': case 'O': cycleOrientation(); break;
+      case 'o': case 'O': toggleOrientation(); break;
       case 'g': case 'G': setGuide(!settings.guide); break;
       case 'l': case 'L': openLibrary(); break;
       case 'h': case 'H': if (state.doc) document.body.classList.toggle('immersive'); break;
