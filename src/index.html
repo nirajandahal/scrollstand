@@ -204,6 +204,14 @@ body.immersive #busy { top: calc(var(--sat) + 10px); }
   :root[data-theme="system"][data-pdf-invert="on"][data-contrast="high"] .page { background: #000; }
 }
 :root[data-theme="night"][data-pdf-invert="on"][data-contrast="high"] .page { background: #000; }
+/* Dark PDF pages: the GPU inverts the page; pictures are laid back on top in their real colours */
+:root[data-theme="night"][data-pdf-invert="on"] .page canvas.pg { filter: invert(.88) hue-rotate(180deg); }
+:root[data-theme="night"][data-pdf-invert="on"][data-contrast="high"] .page canvas.pg { filter: invert(1) hue-rotate(180deg); }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"][data-pdf-invert="on"] .page canvas.pg { filter: invert(.88) hue-rotate(180deg); }
+  :root[data-theme="system"][data-pdf-invert="on"][data-contrast="high"] .page canvas.pg { filter: invert(1) hue-rotate(180deg); }
+}
+.page canvas.pic { inset: auto; }
 /* Read aloud: the sentence being spoken */
 ::highlight(read-now) { background-color: var(--band); text-decoration: underline 2px var(--amber); text-underline-offset: 4px; }
 .hl.read i { background: var(--band); box-shadow: inset 0 -2px 0 var(--amber); border-radius: 2px; }
@@ -1138,7 +1146,6 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
 
     let view = meta.kind === 'pdf' ? (meta.view || 'pages') : 'text';
     if (view === 'text' && !(await ensurePdfText(doc, meta.page || 0))) view = 'pages';
-    if (doc.pdf) finishPdfSetup(doc);
     setLoading(false);
     await showView(view, targetFromMeta(meta, view));
 
@@ -1204,27 +1211,41 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     }
     doc.pdf = pdf;
     doc.pageCount = pdf.numPages;
-    setLoading(`Opening ${pdf.numPages}-page PDF…`);
-    // Only the first page is needed to start showing the document; the rest load as needed
-    const first = await pdf.getPage(1);
-    const vp1 = first.getViewport({ scale: 1 });
+    // Read every page before showing the document. It's quick, and afterwards the PDF engine
+    // is free to draw what's on screen straight away, with every page at its real size.
+    const total = pdf.numPages;
+    setLoading(`Reading page 1 of ${total}…`);
+    const loaded = new Array(total);
+    const BATCH = 8;
+    for (let i = 0; i < total; i += BATCH) {
+      const nums = [];
+      for (let n = i + 1; n <= Math.min(total, i + BATCH); n++) nums.push(n);
+      const got = await Promise.all(nums.map((n) => pdf.getPage(n).catch(() => null)));
+      got.forEach((pg, k) => { loaded[nums[k] - 1] = pg; });
+      const done = Math.min(total, i + BATCH);
+      if (total > BATCH && (done % 24 === 0 || done === total)) setLoading(`Reading page ${done} of ${total}…`);
+    }
+    const fallback = loaded.find(Boolean);
+    const fvp = fallback ? fallback.getViewport({ scale: 1 }) : { width: 595, height: 842 };
     const frag = document.createDocumentFragment();
     const pages = [];
-    for (let n = 1; n <= pdf.numPages; n++) {
+    for (let n = 1; n <= total; n++) {
+      const pg = loaded[n - 1];
+      const vp = pg ? pg.getViewport({ scale: 1 }) : fvp;
       const el = document.createElement('div');
       el.className = 'page';
       el.dataset.i = n - 1;
       el.setAttribute('aria-label', `Page ${n}`);
       el.dataset.n = n;
       pages.push({
-        num: n, pdf, page: n === 1 ? first : null, sized: n === 1, w: vp1.width, h: vp1.height,
-        el, canvas: null, task: null, rendering: 0, visible: false, cssW: 0, cssH: 0,
+        num: n, pdf, page: pg, sized: !!pg, w: vp.width, h: vp.height,
+        el, canvas: null, pics: [], task: null, rendering: 0, visible: false, cssW: 0, cssH: 0,
       });
       frag.appendChild(el);
     }
     doc.pageList = pages;
     doc.frag = frag;
-    doc.linePt = 14; // refined in the background once the document is showing
+    doc.linePt = await detectLineHeight(pdf);
   }
 
   // Background jobs report progress in the pill under the top bar, with a time estimate
@@ -1248,13 +1269,6 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
   async function waitForDrawing(doc) {
     while (state.drawing > 0 && state.doc === doc) await new Promise((r) => setTimeout(r, 60));
   }
-  async function waitForFirstDraw(doc) {
-    const until = performance.now() + 5000;
-    while (state.doc === doc && !els.pages.querySelector('.page.drawn') && state.view === 'pages' && performance.now() < until) {
-      await new Promise((r) => setTimeout(r, 60));
-    }
-  }
-
   // Load a page on first use; pages assume the first page's size until then
   async function getPg(p) {
     if (!p.page) {
@@ -1270,29 +1284,6 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       }
     }
     return p.page;
-  }
-
-  // After the document is on screen: measure line spacing, then check the other pages' sizes
-  async function finishPdfSetup(doc) {
-    await waitForFirstDraw(doc);
-    await waitForDrawing(doc);
-    if (state.doc !== doc) return;
-    const lp = await detectLineHeight(doc.pdf);
-    if (state.doc !== doc) return;
-    state.linePt = lp;
-    layout(true);
-    const pages = doc.pageList;
-    const started = performance.now();
-    const showProgress = pages.length > 40;
-    for (let i = 0; i < pages.length; i += 6) {
-      await waitForDrawing(doc);
-      if (state.doc !== doc) { setBusy('pages', null); return; }
-      await Promise.all(pages.slice(i, i + 6).map((p) => getPg(p).catch(() => null)));
-      const done = Math.min(pages.length, i + 6);
-      if (showProgress) setBusy('pages', progressText('Checking pages', done, pages.length, started));
-      await new Promise((r) => setTimeout(r, 20));
-    }
-    setBusy('pages', null);
   }
 
   // Estimate the typical distance between text lines (in PDF points)
@@ -1391,7 +1382,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       await waitForDrawing(doc);
       if (state.doc && state.doc !== doc) { doc.textStreaming = false; setBusy('text', null); return; }
       const before = doc.textParts.length;
-      await extractPdfBatch(doc, 8);
+      await extractPdfBatch(doc, 4);
       if (state.doc && state.doc !== doc) { doc.textStreaming = false; setBusy('text', null); return; }
       setBusy('text', progressText('Loading text', doc.textNext, doc.pageCount,
         started - ((performance.now() - started) * startPage) / Math.max(1, doc.textNext - startPage)));
@@ -1899,23 +1890,36 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     return rects;
   }
 
-  // Darken a rendered page, then paint the pictures back in their real colours
-  async function darkenPage(p, canvas, mode, drawnOps) {
+  // Dark pages are inverted by the GPU (CSS filter on the page canvas, which costs nothing).
+  // Pictures are copied back on top, unfiltered, so they keep their real colours.
+  function clearPictures(p) {
+    for (const c of p.pics || []) { c.width = c.height = 0; c.remove(); }
+    p.pics = [];
+  }
+  async function updatePictures(p, drawnOps) {
+    const want = p.rendered;
+    if (!pdfDarkMode()) { clearPictures(p); p.picsFor = ''; return; }
+    if (!p.canvas || (p.pics && p.pics.length) || p.picsFor === want) return;
+    p.picsFor = want;
     const rects = await pageImageRects(p, drawnOps);
-    const out = document.createElement('canvas');
-    out.width = canvas.width;
-    out.height = canvas.height;
-    const ctx = out.getContext('2d', { alpha: false });
-    ctx.filter = mode === 'high' ? 'invert(1) hue-rotate(180deg)' : 'invert(.88) hue-rotate(180deg)';
-    ctx.drawImage(canvas, 0, 0);
-    ctx.filter = 'none';
+    const src = p.canvas;
+    if (!src || p.rendered !== want || !pdfDarkMode() || !p.el.isConnected) { p.picsFor = ''; return; }
+    clearPictures(p);
     for (const r of rects) {
-      const x = Math.floor(r.l * canvas.width), y = Math.floor(r.t * canvas.height);
-      const w = Math.ceil((r.r - r.l) * canvas.width), h = Math.ceil((r.b - r.t) * canvas.height);
-      if (w > 0 && h > 0) ctx.drawImage(canvas, x, y, w, h, x, y, w, h);
+      const x = Math.floor(r.l * src.width), y = Math.floor(r.t * src.height);
+      const w = Math.ceil((r.r - r.l) * src.width), h = Math.ceil((r.b - r.t) * src.height);
+      if (w <= 0 || h <= 0) continue;
+      const c = document.createElement('canvas');
+      c.className = 'pic';
+      c.width = w; c.height = h;
+      c.getContext('2d', { alpha: false }).drawImage(src, x, y, w, h, 0, 0, w, h);
+      Object.assign(c.style, {
+        left: (x / src.width * 100) + '%', top: (y / src.height * 100) + '%',
+        width: (w / src.width * 100) + '%', height: (h / src.height * 100) + '%',
+      });
+      p.el.appendChild(c);
+      p.pics.push(c);
     }
-    canvas.width = canvas.height = 0;
-    return out;
   }
 
   async function renderPage(p) {
@@ -1925,8 +1929,7 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
 
   async function drawPage(p) {
     const scale = state.scale;
-    const dark = pdfDarkMode();
-    const want = `${scale}|${dark}`;
+    const want = `${scale}`;
     if (!p.cssW || p.rendered === want || p.rendering === want) return;
     if (p.task) { p.task.cancel(); p.task = null; }
     p.rendering = want;
@@ -1952,23 +1955,31 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
       return;
     }
     if (p.task !== task) return;
-    let shown = canvas;
-    if (dark) shown = await darkenPage(p, canvas, dark, task._internalRenderTask && task._internalRenderTask.operatorList);
-    if (p.task !== task) { shown.width = shown.height = 0; return; }
+    const shown = canvas;
+    shown.className = 'pg';
     p.task = null;
     p.rendering = 0;
     if (!p.visible || !p.el.isConnected) { shown.width = shown.height = 0; return; }
     if (p.canvas) { p.canvas.width = p.canvas.height = 0; p.canvas.remove(); }
+    clearPictures(p);
+    p.picsFor = '';
     p.el.appendChild(shown);
     p.el.classList.add('drawn');
     p.canvas = shown;
     p.rendered = want;
+    // The page is on screen now; pictures get their colours back just after
+    if (pdfDarkMode()) {
+      const ops = task._internalRenderTask && task._internalRenderTask.operatorList;
+      setTimeout(() => updatePictures(p, ops), 0);
+    }
   }
 
   function releasePage(p) {
     if (p.task) { p.task.cancel(); p.task = null; }
     p.rendering = 0;
     if (p.canvas) { p.canvas.width = p.canvas.height = 0; p.canvas.remove(); p.canvas = null; }
+    clearPictures(p);
+    p.picsFor = '';
     p.el.classList.remove('drawn');
     p.rendered = '';
   }
@@ -2933,8 +2944,8 @@ body:not([data-kind="pdf"]) .only-pdf { display: none; }
     root.dataset.pdfInvert = settings.pdfInvert ? 'on' : 'off';
     root.dataset.contrast = settings.contrast;
     document.body.classList.toggle('mirror', settings.mirror);
-    // Re-draw visible PDF pages if their darkening changed
-    for (const pg of state.pages) if (pg.visible && state.view === 'pages') renderPage(pg);
+    // Darkening is a CSS filter now; only the colour-kept pictures need updating
+    for (const pg of state.pages) if (pg.visible && state.view === 'pages') updatePictures(pg);
     els.themeMeta.setAttribute('content', getComputedStyle(root).getPropertyValue('--chrome-solid').trim() || '#F8F9FB');
     const SystemBars = isNative && Cap.Plugins.SystemBars;
     if (SystemBars) {
